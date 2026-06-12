@@ -23,6 +23,11 @@
 | SoFi Stadium | 洛杉矶 | 33.9533 | -118.3392 | 封闭 | ✅ |
 | Rose Bowl | 帕萨迪纳 | 34.1614 | -118.1676 | 露天 | 无 |
 | Levi's Stadium | 圣克拉拉 | 37.4033 | -121.9699 | 露天 | 无 |
+| Hard Rock Stadium | 迈阿密 | 25.9580 | -80.2389 | 露天 | 无 |
+| MetLife Stadium | 东卢瑟福 | 40.8135 | -74.0745 | 露天 | 无 |
+| Arrowhead Stadium | 堪萨斯城 | 39.0489 | -94.4839 | 露天 | 无 |
+| Lincoln Financial Field | 费城 | 39.9008 | -75.1675 | 露天 | 无 |
+| Gillette Stadium | 福克斯堡 | 42.0909 | -71.2643 | 露天 | 无 |
 | Lumen Field | 西雅图 | 47.5952 | -122.3316 | 露天 | 无 |
 
 ## Open-Meteo 查询模板

@@ -16,28 +16,32 @@ WC2026 wiki 中可用于比赛预测的数据文件和字段说明。
 | 伤病总览 | `concepts/伤病追踪总表.md` | Markdown | 48队伤病全景（❌确认缺席/⚠️存疑/✅恢复），2026-05-23创建 |
 | 热身赛追踪 | `warmup/` 全套（README + schedule + results/） | Markdown | 赛程+已录结果+模板，2026-05-23创建 |
 
-## 📊 8维度评分说明
+## 📊 10维度评分说明
 
 | 维度 | 数据来源 | 权重建议 |
 |:----|:---------|:---------|
 | 1. 实力评估 | entities/ (FIFA排名 + 球员总身价 + 大赛经验评分) | 高 |
 | 2. 近期状态 | comparisons/recent-form/ (近6场胜率 + 进球/失球趋势) | 高 |
-| 3. 阵容完整性 | entities/ + SerpAPI搜索 (伤病缺阵影响程度) | 高 |
+| 3. 阵容完整性 | entities/ + browser→Google搜索 (伤病缺阵影响程度) | 高 |
 | 4. 战术对位 | entities/ (阵型相克 + 风格克制分析) | 中 |
 | 5. 历史交锋 | comparisons/ (心理优势 + 比分模式) | 中 |
 | 6. 外部因素 | concepts/ + weather-collection (主客场 + 海拔高度 + 天气温度+湿度 + 休息天数) 详见 references/weather-collection-workflow.md | 中 |
-| 7. 关键球员 | entities/ + SerpAPI搜索 (球星个人能力 + 对位优势) | 中 |
+| 7. 关键球员 | entities/ + browser→Google搜索 (球星个人能力 + 对位优势) | 中 |
 | 8. 大赛心理 | entities/ (历史大赛表现 + 淘汰赛经验) | 低 |
 | 9. 名宿观点 | matches/ (多名名宿加权预测) | 低 |
 | 10. 深层数据 | matches/ (xG, 控球率, 射门转化率) | 低 |
 
 ## 🔍 赛前搜索模板
 
-赛前2-4小时，用 SerpAPI 搜索以下情报：
+赛前2-4小时，用 browser_navigate→Google 搜索以下情报：
 ```bash
-python3 ~/.hermes/skills/serpapi-search/scripts/search.py "{队名} {队名} 2026 World Cup lineup injury latest" --country cn --lang zh-CN --limit 5 --json
-python3 ~/.hermes/skills/serpapi-search/scripts/search.py "{队名} vs {队名} 2026 match preview" --limit 5 --json
+# 搜索阵容/伤病/首发最新消息
+browser_navigate "https://www.google.com/search?q={队名}+World+Cup+2026+lineup+injury+latest"
+
+# 搜索赛前分析/预测
+browser_navigate "https://www.google.com/search?q={队名}+vs+{队名}+World+Cup+2026+preview"
 ```
+**注意**：搜完必须点进至少 5-8 篇文章读全文，禁止只看摘要就下结论。
 
 ## 📤 预测输出格式
 
