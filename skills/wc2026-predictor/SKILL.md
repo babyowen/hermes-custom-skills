@@ -11,13 +11,26 @@ metadata:
 
 ## 概述
 
-基于已积累的球队情报（entities/ + matches/ + warmup/），赛前收集赔率/天气/新闻，10维度评分生成预测。**预测前必须从 FotMob 验证赛程**（模板生成的 match pages 曾被证实对阵/日期全错）。
+基于已积累的球队情报（数据根目录：`~/wc2026/`），赛前收集赔率/天气/新闻，10维度评分生成预测。**预测前必须从 FotMob 验证赛程**（模板生成的 match pages 曾被证实对阵/日期全错）。
+
+### 知识库结构
+
+所有数据在 `~/wc2026/` 下：
+```
+~/wc2026/
+├── entities/         ← 48支球队实体页（阵容/伤病/热身赛数据）
+├── matches/小组赛/   ← 74场小组赛独立页面（战术/赔率/天气/复盘）
+├── comparisons/      ← 73组历史交锋数据
+├── warmup/results/   ← 42场热身赛结果
+├── wiki/concepts/    ← 裁判/伤病追踪/场地分析
+└── raw/articles/     ← 153篇原始采集文章
+```
 
 ## 赛前预测执行流程
 
 ```
 ① browser_navigate→FotMob 获取真实赛程 fotmob.com/leagues/77/fixtures/world-cup
-② 查 entities/{队名}.md 获取阵容/伤病/热身赛数据
+② 查 ~/wc2026/entities/{队名}.md 获取阵容/伤病/热身赛数据
 ③ 搜赔率: The Odds API (key=e957983e5449073eedc1e6fafc619a74, sport=soccer_fifa_world_cup) + Polymarket
 ④ browser_navigate→Google 搜索最新情报，**必须点开读全文，多源交叉验证**
    - 搜完 Google → 浏览所有摘要 → 挑有价值文章 **逐篇点进去读全文**
