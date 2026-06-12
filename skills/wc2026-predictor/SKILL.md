@@ -19,7 +19,11 @@ metadata:
 ① browser_navigate→FotMob 获取真实赛程 fotmob.com/leagues/77/fixtures/world-cup
 ② 查 entities/{队名}.md 获取阵容/伤病/热身赛数据
 ③ 搜赔率: The Odds API (key=e957983e5449073eedc1e6fafc619a74, sport=soccer_fifa_world_cup) + Polymarket
-④ browser_navigate→Google 搜索最新情报（可用站点: SI.com/Guardian/Goal.com, 避开ESPN/BBC/Sky）
+④ browser_navigate→Google 搜索最新情报，**必须逐一点开可用站点读全文**
+   - 搜完 Google → 浏览结果摘要 → 挑有价值的文章 **点进去读全文**
+   - 优先站点：SI.com(✅全文) / The Guardian(✅) / Goal.com(✅) / Reuters(✅)
+   - 摘要里看不到的：战术细节、伤病首发确认、教练发布会原话、赔率变动原因
+   - **禁止只看 Google 摘要就下结论**——每场比赛至少精读 2-3 篇赛前分析
 ⑤ 🌤️ 露天场馆天气 → Open-Meteo API（免费，无需key），坐标查 references/mexico-venue-coordinates.md
 ⑥ 10维度评分 + 特殊情景修正 + 净需求分析
 ⑦ 输出预测报告推送到飞书
