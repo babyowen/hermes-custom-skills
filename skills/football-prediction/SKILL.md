@@ -63,27 +63,33 @@ Key signal: when sharp books and retail books diverge by **>3%** on the same out
 
 ## Phase 2: Research Context
 
-### 2a. Search match previews, team news, and X/Twitter
+### 2a. Search match context via web_search(Parallel)
 
-Search for match context using SerpAPI. Essential search queries:
+Search for match context using Parallel 免费 MCP. Essential search queries:
 
-```bash
-1. "{team1} vs {team2} preview May 2026"  → match previews, predictions
-2. "{team1} injury news {team2} team news" → injury/suspension updates
-3. "{team1} form last 5 games"             → recent results and form
-4. "{team1} {team2} head to head results"  → H2H record
-5. "{league} table standings relegation"   → league context and stakes
-6. "{manager} press conference {team} {team}"  → pre-match quotes
+```python
+# All queries use web_search(Parallel) — free, fast
+web_search("{team1} vs {team2} preview May 2026")       # match previews
+web_search("{team1} injury news {team2} team news")      # injury/suspension
+web_search("{team1} form last 5 games")                  # recent results
+web_search("{team1} {team2} head to head")               # H2H record
+web_search("{league} table standings relegation")        # league context
+web_search("{manager} press conference {team}")          # pre-match quotes
 ```
 
 ### 2b. Search X/Twitter for breaking news (crucial!)
 
 Press conferences, lineup leaks, and last-minute stories often break on X first.
-Search with SerpAPI using `site:x.com` prefix:
+Use the `x_search` tool (auto-enabled when XAI_API_KEY is configured):
 
-```bash
-SERPAPI_KEY=$(grep SERPAPI_API_KEY ~/.hermes/.env | cut -d= -f2 | tr -d ' ')
-curl -s "https://serpapi.com/search.json?q=site:x.com+{manager}+{team}+{keyword}&api_key=${SERPAPI_KEY}&num=8"
+```python
+x_search("{manager} {team} {keyword} site:x.com")
+```
+
+Or use web_search(Parallel) with `site:x.com` prefix:
+
+```python
+web_search("site:x.com {manager} {team} press conference")
 ```
 
 Look for:
@@ -124,9 +130,8 @@ Use the Gamma API to get prices and the Gamma API's `oneDayPriceChange` / `oneWe
 | All three within 2% change | No clear directional bias |
 | Large move without matching news | Potential overreaction → fade opportunity |
 
-> **Polymarket fee structure (Sports category)**: Taker 3%, Maker 0% + 25% rebate.
-> Always prefer **limit (Maker) orders** to avoid fees on small edges (<5%).
-
+- **Polymarket fee structure (Sports category)**: Taker 3%, Maker 0% + 25% rebate.
+  Always prefer limit (Maker) orders to avoid fees on small edges (<5%).
 See the `polymarket` skill's `references/odds-analysis-framework.md` for the full three-source
 comparison methodology (Sharp de-vig + Retail + Polymarket).
 
@@ -197,7 +202,7 @@ requirement (e.g. 1-1 when 1 point is enough), the game dynamic shifts radically
 ## Pitfalls
 
 - **API key month limit**: The Odds API free tier has 500 requests/month. Track usage. WC2026 cron jobs consume ~60/month.
-- **Exa/web_extract 402**: Exa credits can run out. Fall back to SerpAPI for search, direct curl for page scraping.
+- **搜索链路（Parallel 免费 MCP）**：搜索用 web_search(Parallel)，提取用 web_extract(Parallel)，提取失败降级 browser_navigate(本地Chrome) + eval body.innerText。全部免费。
 - **Polymarket DOES have EPL matches** — don't skip it. Use slug-based event search (`epl-tot-eve-YYYY-MM-DD`),
   not keyword search. See `polymarket` skill's `references/sports-market-finding.md`.
 - **Polymarket orderbook depth** — before recommending a trade, verify liquidity:
@@ -209,7 +214,6 @@ requirement (e.g. 1-1 when 1 point is enough), the game dynamic shifts radically
 - **Odds format**: Always use `oddsFormat=decimal` for calculation ease. Convert to implied probability with `1/price`.
 - **Betting margins**: Sum of implied probs typically ~103-107% (the vig/juice). Always de-vig before comparing sources.
 - **Sharp doesn't mean correct**: Sharp books have better information flow but still get it wrong. Use as a signal, not an oracle.
-- **SerpAPI result extraction**: Use `data.get('organic_results',[])` in SerpAPI JSON response, not `data.get('organic',[])`.
 - **Game-state logic trumps odds**: A Sharp 55% favorite with nothing to play for at 1-1 is not really 55%.
   Account for motivation in your final prediction, especially in the final 15 minutes.
 - **Press conference quotes > media speculation**: Manager's actual words (from X/transcripts) are more reliable
