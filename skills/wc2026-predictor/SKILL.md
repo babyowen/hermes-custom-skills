@@ -32,30 +32,48 @@ metadata:
 ① browser_navigate→FotMob 获取真实赛程 fotmob.com/leagues/77/fixtures/world-cup
 ② 查 ~/wc2026/entities/{队名}.md 获取阵容/伤病/热身赛数据
 ③ 搜赔率: The Odds API (key=e957983e5449073eedc1e6fafc619a74, sport=soccer_fifa_world_cup) + Polymarket
-④ 搜索最新情报 — **Parallel 免费 MCP + web_extract 降级 browser**
-   - `web_search(Parallel)` → 秒出结果，搜各新闻关键词
-   - `web_extract(Parallel)` → 直接读正文（免费、快、Markdown 干净）
+④ 搜索最新情报 — **Parallel 免费 MCP + web_extract 降级 browser, 每场 100 篇**
+   - `web_search(Parallel)` → 秒出结果，20 个关键词 × 5 条 = 100 篇来源
+   - `web_extract(Parallel)` → 批量提取正文（免费、快、Markdown 干净）
    - 提取失败（反爬/JS） → `browser_navigate(本地Chrome)` + `eval body.innerText`
-   - **每场比赛至少精读 12-15 篇赛前分析**，web_extract 速度快不费力，可以多看
-   - 必须覆盖的新闻类型：
-     · 3-4 篇赛前战报/前瞻（了解整体格局，来源多样化）
-     · 2-3 篇战术分析（阵型对位、关键对位、弱侧利用）
-     · 2-3 篇伤病/阵容更新（确认首发、谁缺席、恢复情况）
-     · 2-3 篇教练发布会报道（原话往往藏信号，交叉验证）
-     · 1-2 篇赔率/盘口分析（市场怎么看、资金流向）
-     · 1-2 篇当地媒体/球迷社区反应（更衣室氛围、士气信号）
-   - 搜索策略：不只看 SI/Guardian/Goal 这类大媒体，还要搜以下维度：
-     · **当地媒体**（墨西哥/美国/加拿大本地记者）— 更早爆出首发/伤病
-     · **战术数据站**（The Athletic、Total Football Analysis）
-     · **博彩/赔率分析站**（Oddschecker、BettingSites）
-     · **社媒反应**（X/Twitter 关键词：`site:x.com {队名} {关键词}`）
-   - 搜索关键词示例：
-     · `{队A} vs {队B} 2026 World Cup preview tactics formation`
-     · `{队A} predicted lineup injury latest`
-     · `{教练名} press conference {队名} pre-match`
-     · `{队A} {队B} odds analysis sharp money`
-     · `site:x.com {队A} lineup leak starting XI`
-   - **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
+   - **搜索 + 提取 100 篇约 5 分钟**，全部免费无配额限制
+   - 100 篇须有策略地分布在以下维度（避免同质化）：
+
+**12 个维度 × 每个维度 5-10 个搜索词：**
+
+| 维度 | 篇数 | 目的 |
+|:----|:----|:----|
+| 赛前战报/前瞻 | 8 篇 | 整体格局、来源多样化 |
+| 战术分析 | 8 篇 | 阵型对位、关键对位、弱侧利用 |
+| 伤病/阵容更新 | 8 篇 | 首发确认、谁缺席、恢复情况 |
+| 教练发布会 | 8 篇 | 原话交叉验证，信号提取 |
+| 赔率/盘口分析 | 8 篇 | 市场怎么看、资金流向 |
+| **当地媒体** | 8 篇 | 更早爆出首发/伤病（墨西哥/美国/加拿大本地记者） |
+| **同组形势** | 8 篇 | 关联分析：另一场比赛结果对本场的影响 |
+| **历史交锋** | 5 篇 | 过往比分模式、心理优势 |
+| **裁判分析** | 5 篇 | 主裁判执法风格、红黄牌倾向 |
+| **社媒/球迷反应** | 5 篇 | 更衣室氛围、士气信号 |
+| **深度数据(xG等)** | 5 篇 | The Athletic / Opta 数据分析 |
+| **双方近期状态** | 24 篇 | 每队 12 篇：近 5 场战报、进球模式、防守漏洞 |
+
+**搜索策略**：不只看 SI/Guardian/Goal 这类大媒体，还要搜：
+- **当地媒体**（墨西哥/美国/加拿大本地记者）— 更早爆出首发/伤病
+- **战术数据站**（The Athletic、Total Football Analysis）
+- **博彩/赔率分析站**（Oddschecker、BettingSites）
+- **社媒反应**（X/Twitter 关键词：`site:x.com {队名} {关键词}`）
+
+**搜索关键词示例**（按维度）：
+- 战报：`{队A} vs {队B} 2026 World Cup match report preview`
+- 战术：`{队A} vs {队B} tactics formation predicted lineup analysis`
+- 伤病：`{队A} injury news World Cup 2026 latest squad update`
+- 发布会：`{教练名} press conference {队名} pre-match quotes`
+- 赔率：`{队A} {队B} odds moneyline sharp movement betting`
+- 当地：`site:elnorte.com {队A} World Cup 2026` / `site:naver.com {队B} 2026`
+- 同组：`World Cup 2026 Group {X} standings qualification scenarios`
+- 裁判：`{裁判名} referee stats yellow cards World Cup 2026`
+- 深度：`{队A} expected goals xG statistics 2026 World Cup`
+- 社媒：`site:x.com {队A} World Cup 2026 lineup leak starting XI`
+- **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
 
 ④.5 **对照本地实体库，交叉验证**
    - 读 `~/wc2026/entities/{队A}.md` 和 `~/wc2026/entities/{队B}.md`
