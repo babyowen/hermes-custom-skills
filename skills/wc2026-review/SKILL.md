@@ -42,7 +42,7 @@ wc2026/reviews/
 
 **工具优先级**：
 1. 🥇 **The Odds API**（`soccer_fifa_world_cup`）— 返回已完成比赛的最终比分（`completed`状态）
-2. 🥈 **browser→Google 搜索** — 搜索比赛名+goal scorers，Google体育知识面板直接显示进球者+时间
+2. 🥈 **web_search(Parallel) → 搜 goal scorers** — 免费 MCP 秒搜，摘要通常已包含进球者+时间
 3. 🥉 **FotMob browser** — 逐个检查比赛详情页的最终比分
 
 ```python
@@ -63,14 +63,15 @@ for m in scores:
 
 The Odds API 只返回比分，不返回进球者/时间。获取详情的方法：
 
-**browser→Google 搜索（最可靠，Exa断供时唯一可用）**：
+**web_search(Parallel) → 搜 goal scorers（免费、秒出）**：
 ```python
-# 搜索 "[主队] vs [客队] goal scorers" → Google体育知识面板直接显示
-# 返回格式：Ladislav Krejčí 59', Hwang In-beom 67', Oh Hyeon-gyu 80'
-browser_navigate("https://www.google.com/search?q=South+Korea+vs+Czech+goal+scorers")
-# 从 snapshot 中的"Sports results"或"Videos"分组提取
+# 搜索 "{队A} vs {队B} 2026 World Cup goal scorers"
+# Parallel 免费 MCP 的搜索结果摘要通常直接包含进球者和时间
+# 摘要不足时 web_extract(Parallel) 读正文
+# 都失败再 browser_navigate→Google 体育知识面板
+web_search("South Korea vs Czech 2026 World Cup goal scorers")
 ```
-**实测效果**（2026-06-12）：Google搜索结果页的体育知识面板直接包含进球者、时间、比赛回顾链接，无需点击任何文章。这是 Exa/SerpAPI 均不可用时获取进球详情的唯一可靠方法。
+**实测效果**：Parallel 免费 MCP 搜索结果摘要通常已包含进球详情，无需点开文章。比 browser_navigate 快得多。
 
 ### 第二步：对比预测
 
@@ -235,8 +236,8 @@ browser_navigate("https://www.google.com/search?q=South+Korea+vs+Czech+goal+scor
 ## Pitfalls
 
 - **Odds API scores 是列表而非字典**：`m.get('scores')` 返回的是 `[{"name": "Mexico", "score": "2"}, {"name": "South Africa", "score": "0"}]` 格式的列表，不是 `{"home": "2", "away": "0"}` 字典。示例代码中的 `.get('home')` 会抛出 AttributeError。正确写法：`score_list = m.get('scores', []); hs = score_list[0]['score'] if len(score_list) > 0 else '?'`
-- **Exa API 耗尽时获取进球详情**：web_extract 返回 402，web_search 也返回 402。此时用 browser_navigate→Google 搜索比赛名+"goal scorers"，Google 体育知识面板直接显示进球者+时间，无需点击任何文章。这是最可靠的进球详情来源。
-- **SerpAPI 脚本已删除**：`~/.hermes/skills/serpapi-search/scripts/search.py` 已随 v1.10.0 更新被移除。不要尝试调用这个路径，直接用 browser_navigate→Google。
+- **Parallel 免费 MCP 获取进球详情**：搜比赛名+goal scorers，Parallel 摘要通常已有进球者+时间，不足则 web_extract 读，再不行 browser→Google
+- **SerpAPI/Exa 均已废弃**：SerpAPI 脚本已删除，Exa key 已注释。搜和提取全部走 Parallel 免费 MCP 降级 browser 链路。
 - **赛后必须同步伤病追踪表**：红牌球员必须在 `concepts/伤病追踪总表.md` 中标记为 ❌ 停赛。这是复盘流程中容易遗漏的步骤。
 - **预测记录查找**：`session_search` 可能找不到之前的赛前预测输出。备选方案是直接读 match pages 中的「系统预测」区块（每个 match page 的 🤖 部分包含完整评分+预测概率+推荐比分）。
 - **accuracy-scoring nuance**：当预测同时包含首选（如 1-1）和次选（如 2-1 韩国），实际为次选结果时 → 胜负方向✅，推荐比分❌，在备注中标注"次选正确"。

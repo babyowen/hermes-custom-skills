@@ -32,18 +32,19 @@ metadata:
 ① browser_navigate→FotMob 获取真实赛程 fotmob.com/leagues/77/fixtures/world-cup
 ② 查 ~/wc2026/entities/{队名}.md 获取阵容/伤病/热身赛数据
 ③ 搜赔率: The Odds API (key=e957983e5449073eedc1e6fafc619a74, sport=soccer_fifa_world_cup) + Polymarket
-④ browser_navigate→Google 搜索最新情报，**必须点开读全文，多源交叉验证**
-   - 搜完 Google → 浏览所有摘要 → 挑有价值文章 **逐篇点进去读全文**
-   - 优先站点：SI.com / The Guardian / Goal.com / Reuters / The Athletic / FOX Sports
-   - **每场比赛至少精读 5-8 篇赛前分析**，来源必须分散（不能全来自同一家媒体）
+④ 搜索最新情报 — **Parallel 免费 MCP + web_extract 降级 browser**
+   - `web_search(Parallel)` → 秒出结果，搜各新闻关键词
+   - `web_extract(Parallel)` → 直接读正文（免费、快、Markdown 干净）
+   - 提取失败（反爬/JS） → `browser_navigate(本地Chrome)` + `eval body.innerText`
+   - **每场比赛至少精读 8-12 篇赛前分析**，web_extract 速度快不费力，可以多看
    - 必须覆盖的新闻类型：
-     · 1-2 篇赛前战报/前瞻（了解整体格局）
-     · 1-2 篇战术分析（阵型对位、关键对位）
-     · 1-2 篇伤病/阵容更新（确认首发、谁缺席）
-     · 1 篇教练发布会报道（原话往往藏信号）
-     · 1 篇赔率/盘口分析（市场怎么看）
-   - 摘要里看不到的：战术细节、首发确认、教练发布会原话、赔率变动原因
-   - **禁止只看 Google 摘要就下结论**——必须真正读过原文再评分
+     · 2-3 篇赛前战报/前瞻（了解整体格局）
+     · 2-3 篇战术分析（阵型对位、关键对位）
+     · 2-3 篇伤病/阵容更新（确认首发、谁缺席）
+     · 1-2 篇教练发布会报道（原话往往藏信号）
+     · 1-2 篇赔率/盘口分析（市场怎么看）
+   - 搜索关键词示例：`{队A} vs {队B} 2026 World Cup preview`、`{队A} injury`、`{队名} formation tactics`、`{教练名} press conference`
+   - **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
 ⑤ 🌤️ 露天场馆天气 → Open-Meteo API（免费，无需key），坐标查 references/mexico-venue-coordinates.md
 ⑥ 10维度评分 + 特殊情景修正 + 净需求分析
 ⑦ 输出预测报告推送到飞书
@@ -96,6 +97,8 @@ metadata:
 | 🌧️ 暴雨/雷阵雨 | 草皮湿滑影响技术型 | -0.2~0.3 |
 | 📉 只需1分即出线/保级 | 75分钟后收缩死守,不反扑 | -1.0~1.5（进攻端） |
 | 🎭 揭幕战情绪因子 | 大赛首场红牌/情绪失控概率高 | -0.3（双方） |
+| 💪 大赛首战斗志加成 | 中下游球队在赛事首战展现拼搏斗志和超常体能 | +0.3（中下游球队） |
+| 🪄 替补建功效应 | 大赛首轮替补球员出场后进球概率升高（韩国5名替补世界杯首秀进球） | +0.2（替补端威胁评估） |
 
 ## 🔑 净需求 > 纸面实力
 

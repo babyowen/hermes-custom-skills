@@ -45,7 +45,7 @@ ls ~/wc2026/reviews/match-reports/ | grep {日期}
 
 ### ② 逐场搜集赛后新闻
 
-对每场已结束的比赛，用 browser_navigate→Google 搜以下关键词：
+对每场已结束的比赛，用 web_search(Parallel) 搜以下关键词，然后用 web_extract(Parallel) 读正文（提取失败降级 browser_navigate→eval innerText）：
 
 | 关键词组合 | 目的 |
 |-----------|------|
@@ -55,16 +55,11 @@ ls ~/wc2026/reviews/match-reports/ | grep {日期}
 | `{队A} {球员} red card suspension` | 红牌停赛 |
 | `{比赛} odds movement` | 赔率变动 |
 
-**信息源优先级**（web_extract 正常时）：
-SI.com(✅全文) > The Guardian(✅) > Goal.com(✅) > 其他可用站点。避免在 ESPN/BBC/Sky 浪费迭代。
+**提取优先级**：
+1. 🥇 **web_extract(Parallel 免费 MCP)** → 直接读正文，Markdown 干净，速度快
+2. 🥈 提取失败 → **browser_navigate(本地Chrome)** + eval body.innerText
 
-**信息源优先级**（web_extract 不可用/Exa 402 时，使用 browser_navigate 读取）：
-- 🥇 **FotMob 比赛页内嵌的 match review article**（每场比赛详情页都有 FotMob 自写的赛报，全文可读）→ 最快的赛后新闻来源
-- 🥈 **FOX Sports**（browser friendly，全文可读）
-- 🥉 **Al Jazeera**（browser friendly，全文可读，简洁）
-- ❌ 避免：ESPN(0字节curl)、BBC(JS渲染)、Sky Sports(405)
-
-**关于 Exa API (web_extract) 不可用的情况**：这是长期存在的已知问题（API 额度耗尽返回 HTTP 402）。当 `web_extract` 返回 402 时，不要反复重试，立刻切换到 browser_navigate 模式。
+**每场比赛至少读 5-8 篇不同来源的文章**，web_extract 速度快不费力。优先 SI.com / The Guardian / Goal.com / FOX Sports / Al Jazeera。避免在 ESPN/BBC/Sky 浪费迭代（反爬/JS渲染）。
 
 ### ③ 对比预测 vs 实际
 
