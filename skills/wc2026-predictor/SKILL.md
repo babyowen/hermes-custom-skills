@@ -28,18 +28,37 @@ metadata:
 
 ## 赛前预测执行流程
 
+有两个运行模式，由 cron 时间决定：
+
+### 早间版（7:00）—— 情报采集模式
+
+采集所有情报，不做最终评分。产出情报简报。
+
 ```
 ① browser_navigate→FotMob 获取真实赛程 fotmob.com/leagues/77/fixtures/world-cup
 ② 查 ~/wc2026/entities/{队名}.md 获取阵容/伤病/热身赛数据
-③ 搜赔率: The Odds API (key=e957983e5449073eedc1e6fafc619a74, sport=soccer_fifa_world_cup) + Polymarket
+③ 搜赔率: The Odds API + Polymarket
 ④ 搜索最新情报 — **Parallel 免费 MCP + web_extract 降级 browser, 每场 100 篇**
-   - `web_search(Parallel)` → 秒出结果，20 个关键词 × 5 条 = 100 篇来源
-   - `web_extract(Parallel)` → 批量提取正文（免费、快、Markdown 干净）
-   - 提取失败（反爬/JS） → `browser_navigate(本地Chrome)` + `eval body.innerText`
-   - **搜索 + 提取 100 篇约 5 分钟**，全部免费无配额限制
-   - 100 篇须有策略地分布在以下维度（避免同质化）：
+   （同上 12 维度分布）
+④.5 对照本地实体库，交叉验证 — 更新 entity 最新动态
+⑤ 🌤️ 露天场馆天气 → Open-Meteo API
+⑥ 输出情报简报 → 告知用户"📋 情报已更新，晚间 20:00 出最终预测"
+```
 
-**12 个维度 × 每个维度 5-10 个搜索词：**
+### 晚间版（20:00）—— 最终预测模式
+
+在早间情报基础上，做最终评分预测。
+
+```
+① 快速验证：FotMob 确认赛程是否有变
+② 确认关键信息：首发阵容确认？突发伤病？赔率大幅变动？
+③ 10维度评分 + 特殊情景修正 + 净需求分析
+④ 输出预测报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
+```
+
+**🔴 交互模式**：确认采集范围，指定要预测的比赛。cron 模式自动跳过。
+
+### 100 篇搜索维度参考（早间版步骤④使用）
 
 | 维度 | 篇数 | 目的 |
 |:----|:----|:----|
@@ -48,7 +67,7 @@ metadata:
 | 伤病/阵容更新 | 8 篇 | 首发确认、谁缺席、恢复情况 |
 | 教练发布会 | 8 篇 | 原话交叉验证，信号提取 |
 | 赔率/盘口分析 | 8 篇 | 市场怎么看、资金流向 |
-| **当地媒体** | 8 篇 | 更早爆出首发/伤病（墨西哥/美国/加拿大本地记者） |
+| **当地媒体** | 8 篇 | 更早爆出首发/伤病（本地记者） |
 | **同组形势** | 8 篇 | 关联分析：另一场比赛结果对本场的影响 |
 | **历史交锋** | 5 篇 | 过往比分模式、心理优势 |
 | **裁判分析** | 5 篇 | 主裁判执法风格、红黄牌倾向 |
@@ -56,13 +75,7 @@ metadata:
 | **深度数据(xG等)** | 5 篇 | The Athletic / Opta 数据分析 |
 | **双方近期状态** | 24 篇 | 每队 12 篇：近 5 场战报、进球模式、防守漏洞 |
 
-**搜索策略**：不只看 SI/Guardian/Goal 这类大媒体，还要搜：
-- **当地媒体**（墨西哥/美国/加拿大本地记者）— 更早爆出首发/伤病
-- **战术数据站**（The Athletic、Total Football Analysis）
-- **博彩/赔率分析站**（Oddschecker、BettingSites）
-- **社媒反应**（X/Twitter 关键词：`site:x.com {队名} {关键词}`）
-
-**搜索关键词示例**（按维度）：
+搜索关键词示例（按维度）：
 - 战报：`{队A} vs {队B} 2026 World Cup match report preview`
 - 战术：`{队A} vs {队B} tactics formation predicted lineup analysis`
 - 伤病：`{队A} injury news World Cup 2026 latest squad update`
@@ -74,22 +87,6 @@ metadata:
 - 深度：`{队A} expected goals xG statistics 2026 World Cup`
 - 社媒：`site:x.com {队A} World Cup 2026 lineup leak starting XI`
 - **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
-
-④.5 **对照本地实体库，交叉验证**
-   - 读 `~/wc2026/entities/{队A}.md` 和 `~/wc2026/entities/{队B}.md`
-   - 对比新搜到的信息 vs 本地已有数据：
-     · 阵容/伤病有没有更新？
-     · 之前记录的战术分析是否还适用？
-     · 热身赛数据是否与最新报道一致？
-     · 发现矛盾 → 以最新、最权威的来源为准，在 entity 中标记待更新
-   - 更新 entity 页：将新发现的有价值信息追加到对应条目的「最新动态」区
-   - **搜到的信息必须与本地数据交叉验证后才能用于评分**
-⑤ 🌤️ 露天场馆天气 → Open-Meteo API（免费，无需key），坐标查 references/mexico-venue-coordinates.md
-⑥ 10维度评分 + 特殊情景修正 + 净需求分析
-⑦ 输出预测报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
-```
-
-**🔴 交互模式**：确认采集范围，指定要预测的比赛。cron 模式自动跳过。
 
 **⚠️ 所有输出使用北京时间**，括号标注当地时间和场地。
 
