@@ -159,7 +159,7 @@ python3 -c "import json; data=json.load(open('feishu_movies.json')); [print(r['f
 - **输出**：推送到飞书的报告消息
 - **操作**：
   - 汇总新增电影名称、评分、类型
-  - 用 send_message 推送到用户（如 origin 聊天）
+  - 用 lark-cli 推送（`cat report.md | lark-cli --as bot im +messages-send --chat-id "oc_xxx" --markdown -`）
 
 **🔴 CHECKPOINT · 🛑 STOP：即将自动登录迅雷云盘检测下载状态。** 确认用户已准备好（可能需要短信验证码），用户确认后再执行。
 

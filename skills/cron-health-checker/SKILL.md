@@ -157,30 +157,32 @@ cd ~/.hermes/cron/health_check && python3 health_checker.py
 💡 如需修复问题，请告诉我，我可以帮你处理
 ```
 
-### Step 4: 推送修正后的飞书报告
+### Step 4: 推送修正后的飞书报告（使用 lark-cli）
 
 ⚠️ 推送的是 Step 3 生成的修正版报告文件，不是 health_checker.py 的原始输出。
 
-目标地址：`oc_4b7bc3b652e8b27c8a3c683fa4b53aa0`
-
-**推送脚本**（已存在于 skill 的 `references/` 目录下）：
+**使用 lark-cli 发送**（原生 Feishu post 格式，表格/代码块渲染更漂亮）：
 
 ```bash
 # 直接推送最新生成的报告
 cd ~/.hermes/cron/health_check
-python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
-  --report health_check_$(date +%Y%m%d)*.txt
+cat health_check_$(date +%Y%m%d)*_corrected.txt | \
+  lark-cli --as bot im +messages-send \
+    --chat-id "oc_4b7bc3b652e8b27c8a3c683fa4b53aa0" \
+    --markdown -
 ```
 
-或者从 agent 代码中内联推送（当单独运行检查时），使用飞书开放平台机器人 API：
-1. 从 `~/.hermes/.env` 读取 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET`
-2. 调用 `POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal` 获取 `tenant_access_token`
-3. 调用 `POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id` 发送文本消息
-   - `receive_id`: `oc_4b7bc3b652e8b27c8a3c683fa4b53aa0`
-   - `msg_type`: `text`
-   - `content`: JSON 字符串 `{"text": "报告内容"}`
+也可以用 skill 自带的推送脚本（已改成 lark-cli 方式）：
+```bash
+cd ~/.hermes/cron/health_check
+python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
+  --report health_check_$(date +%Y%m%d)*_corrected.txt
+```
 
-具体可复用代码见 `references/feishu-delivery.py`。支持 `--report` 指定报告文件，`--chat` 指定飞书会话 ID。
+**不使用**以下方式（已废弃）：
+- ❌ 飞书开放平台 HTTP API（`tenant_access_token` + `requests.post`）— 旧方式
+- ❌ `send_message` 工具 — 排版不如 lark-cli
+- ❌ Hermes cron 系统 deliver — 排版不如 lark-cli
 
 ### Step 5: 如有问题，征求用户意见
 
