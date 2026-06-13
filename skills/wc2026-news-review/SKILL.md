@@ -47,19 +47,35 @@ ls ~/wc2026/reviews/match-reports/ | grep {日期}
 
 对每场已结束的比赛，用 web_search(Parallel) 搜以下关键词，然后用 web_extract(Parallel) 读正文（提取失败降级 browser_navigate→eval innerText）：
 
+**每场比赛采集 100 篇赛后新闻**，按以下维度分布：
+
+| 维度 | 篇数 | 目的 |
+|:----|:----|:----|
+| 赛后战报/比赛回顾 | 12 篇 | 比赛全貌、转折点、关键事件 |
+| 战术复盘分析 | 12 篇 | 阵型变化、战术调整 |
+| 教练/球员赛后采访 | 12 篇 | 赛后感言、更衣室信号 |
+| 数据统计（xG/控球率） | 10 篇 | Opta/WhoScored 深度数据 |
+| 媒体评分/舆论 | 10 篇 | 各方评价、赛后评级 |
+| 进球/精彩瞬间分析 | 8 篇 | 每个进球的过程拆解 |
+| 伤病更新 | 8 篇 | 比赛中受伤球员的伤情确认 |
+| 红黄牌/纪律 | 8 篇 | 停赛风险、下一场缺席 |
+| 出线形势分析 | 10 篇 | 本场结果对小组排名的影响 |
+| 赔率变动回顾 | 5 篇 | 赛前赔率 vs 赛后复盘 |
+| 双方球迷/社媒反应 | 5 篇 | 情绪面、士气面评估 |
+
+搜索关键词示例：
+
 | 关键词组合 | 目的 |
 |-----------|------|
-| `{队A} vs {队B} World Cup 2026 match report` | 赛后战报 |
-| `{队A} vs {队B} 2026 战术分析` | 战术复盘 |
-| `{队A} World Cup 2026 injury` | 伤病更新 |
+| `{队A} vs {队B} World Cup 2026 match report post-match analysis` | 赛后战报 |
+| `{队A} vs {队B} tactics review formation change` | 战术复盘 |
+| `{教练名} post-match press conference` | 赛后发布会 |
+| `{队A} {球员} injury update` | 伤病更新 |
 | `{队A} {球员} red card suspension` | 红牌停赛 |
-| `{比赛} odds movement` | 赔率变动 |
+| `{比赛} odds movement post-match` | 赔率变动 |
+| `{队A} xG stats expected goals` | 深度数据 |
 
-**提取优先级**：
-1. 🥇 **web_extract(Parallel 免费 MCP)** → 直接读正文，Markdown 干净，速度快
-2. 🥈 提取失败 → **browser_navigate(本地Chrome)** + eval body.innerText
-
-**每场比赛至少读 5-8 篇不同来源的文章**，web_extract 速度快不费力。优先 SI.com / The Guardian / Goal.com / FOX Sports / Al Jazeera。避免在 ESPN/BBC/Sky 浪费迭代（反爬/JS渲染）。
+**提取方式**：`web_extract(Parallel)` → 失败降级 `browser_navigate(本地Chrome)` + eval body.innerText。全部免费，采集一场约 5 分钟。
 
 ### ③ 对比预测 vs 实际
 

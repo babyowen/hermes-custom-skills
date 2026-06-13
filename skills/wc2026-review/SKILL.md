@@ -15,6 +15,7 @@ tags: [wc2026, world-cup, review, post-match, iteration]
 
 ```
 ① 获取前一天赛果 — FotMob browser / The Odds API / Football365 curl
+①.5 赛后新闻采集 — 每场 100 篇，Parallel 免费 MCP + web_extract 降级 browser
 ② 对比预测 — 将实际结果与系统预测进行逐场对比
 ③ 偏差分析 — 按10维度逐一排查：哪个维度看错了？
 ④ 方法论迭代 — 将发现的偏差写入 accuracy-tracking 和 lessons-learned
@@ -44,6 +45,37 @@ wc2026/reviews/
 1. 🥇 **The Odds API**（`soccer_fifa_world_cup`）— 返回已完成比赛的最终比分（`completed`状态）
 2. 🥈 **web_search(Parallel) → 搜 goal scorers** — 免费 MCP 秒搜，摘要通常已包含进球者+时间
 3. 🥉 **FotMob browser** — 逐个检查比赛详情页的最终比分
+
+### ①.5 赛后新闻采集（每场 100 篇，为偏差分析提供依据）
+
+用 Parallel 免费 MCP 批量搜索每场已结束比赛的赛后新闻，按以下维度分布：
+
+| 维度 | 篇数 | 目的 |
+|:----|:----|:----|
+| 赛后战报/比赛回顾 | 12 篇 | 比赛全貌、转折点、关键事件 |
+| 战术复盘分析 | 12 篇 | 阵型变化、战术调整、攻防数据 |
+| 教练/球员赛后采访 | 12 篇 | 赛后感言、对战术的解释、更衣室信号 |
+| 数据统计（xG/控球率） | 10 篇 | Opta/WhoScored 深度数据 |
+| 媒体评分/舆论 | 10 篇 | 各方评价、赛后评级 |
+| 进球/精彩瞬间分析 | 8 篇 | 每个进球的过程拆解 |
+| 伤病更新 | 8 篇 | 比赛中受伤球员的伤情确认 |
+| 红黄牌/纪律 | 8 篇 | 停赛风险、下一场缺席 |
+| 出线形势分析 | 10 篇 | 本场结果对小组排名的影响 |
+| 赔率变动回顾 | 5 篇 | 赛前赔率 vs 赛后复盘 |
+| 双方球迷/社媒反应 | 5 篇 | 情绪面、士气面评估 |
+
+**搜索关键词示例**：
+```
+web_search("{队A} vs {队B} 2026 World Cup match report post-match analysis")
+web_search("{队A} vs {队B} tactics review formation change")
+web_search("{教练名} post-match press conference {队A}")
+web_search("{队A} {球员} injury update after match")
+web_search("{队A} xG stats expected goals {比赛名}")
+web_search("{队A} vs {队B} player ratings man of the match")
+web_search("{比赛名} World Cup 2026 group standings after match")
+```
+
+提取方式：`web_extract(Parallel)` → 失败降级 `browser_navigate(本地Chrome)`。全部免费，搜索+提取一场比赛约 5 分钟。
 
 ```python
 # 示例：从 The Odds API 获取已结束比赛
@@ -225,7 +257,7 @@ web_search("South Korea vs Czech 2026 World Cup goal scorers")
 
 ## Cron 配置
 
-每天 12:00（北京时间）运行，加载 `wc2026-predictor` + `wc2026-review` 两个 skill。
+每天 12:00（北京时间）运行，加载 `wc2026-predictor` + `wc2026-review` 两个 skill。由于每场需采集 100 篇赛后新闻，运行时间约 5-10 分钟。
 
 ```yaml
 定时: 0 12 * * *
