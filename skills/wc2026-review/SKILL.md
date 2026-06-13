@@ -18,7 +18,7 @@ tags: [wc2026, world-cup, review, post-match, iteration]
 ② 对比预测 — 将实际结果与系统预测进行逐场对比
 ③ 偏差分析 — 按10维度逐一排查：哪个维度看错了？
 ④ 方法论迭代 — 将发现的偏差写入 accuracy-tracking 和 lessons-learned
-⑤ 输出复盘报告 — 推送到飞书
+⑤ 输出复盘报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
 ```
 
 ## 数据存储

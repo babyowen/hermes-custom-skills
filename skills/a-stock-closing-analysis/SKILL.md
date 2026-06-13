@@ -121,7 +121,9 @@ lixinger 返回结构统一为 `{"code": 1, "data": [...]}`，`code=1` 表示成
 ```
 
 ### 定时运行（cron）
-已配置 cron ID `0ecce809a17b`，交易日 16:00 自动运行推送飞书。
+已配置 cron ID `0ecce809a17b`，交易日 16:00 自动运行。
+
+**cron 推送方式**：运行脚本生成报告后，用 lark-cli --markdown 推送到飞书，回复简短确认。避免让系统 deliver 完整报告。
 
 ## 数据文件
 

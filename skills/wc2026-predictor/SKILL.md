@@ -47,7 +47,7 @@ metadata:
    - **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
 ⑤ 🌤️ 露天场馆天气 → Open-Meteo API（免费，无需key），坐标查 references/mexico-venue-coordinates.md
 ⑥ 10维度评分 + 特殊情景修正 + 净需求分析
-⑦ 输出预测报告推送到飞书
+⑦ 输出预测报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
 ```
 
 **🔴 交互模式**：确认采集范围，指定要预测的比赛。cron 模式自动跳过。
