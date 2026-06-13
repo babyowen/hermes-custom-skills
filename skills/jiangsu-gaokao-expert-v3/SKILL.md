@@ -70,45 +70,64 @@ version: 5.21
 
 > 📎 各校详细录取分数见 `references/match-schools-scores.md`。**重点关注：上海大学数学/数据科学专业组合度最高，东华大学物化2组有匹配专业。**
 
-## ⚠️ 搜索工具故障链（重要！）
+## ⚠️ 搜索链路（新标准）
 
-**默认 web_search (Exa) 和 web_extract 共享同一信用池，可能同时耗尽。**
+**统一使用 Parallel 免费 MCP + 本地 Chrome 降级链路：**
 
-### 🥇 首选备选：浏览器 Google 搜索（Exa/Sogou 均失效时最佳选择）
+### 🥇 搜索：web_search(Parallel 免费 MCP)
 
-当 `web_search` 返回 402 且搜狗触发反爬时，**浏览器 Google 搜索是最可靠的替代方案**：
+```python
+# 搜关键词，秒出结果
+web_search("南京大学 综合评价 地理科学类 2026")
+```
 
-1. `browser_navigate(url="https://www.google.com/search?q=URL编码后的中文搜索词")` 直接搜索
-2. 浏览器快照包含完整的搜索结果列表（标题、URL、摘要、发布时间）
-3. 找到目标页后，再 `browser_navigate` 到具体页面阅读完整内容
-4. 对官方招生页面（zsb.seu.edu.cn, admissions.cuhk.edu.cn 等静态 HTML 站），浏览器可完整渲染
+- 免费、零配置、中英文都能搜
+- 支持 `site:` 过滤（如 `site:zhuanlan.zhihu.com 江苏 高考`）
+- 每次搜 5 个结果，摘要已包含发布时间和来源
 
-**优点**：不受任何 API 配额限制，Google 搜索结果质量高  
-**缺点**：串行操作（一次只能看一个页面），大页面需滚动加载
-当 web_search 返回 402 credit limit 错误时，web_extract 也必然失败。必须走备选搜索路径。
+### 🥇 提取正文：web_extract(Parallel 免费 MCP)
 
-### 故障恢复链（按优先级）
+```python
+# 直接读正文，返回干净 Markdown
+web_extract(["https://www.zizzs.com/gk/..."])
+```
 
-| 层级 | 工具 | 调用方式 | 限额 |
-|------|------|---------|------|
-| 🥇 首选 | `web_search` (Exa) | 直接调用 | 免费无限，但可能封顶 |
-| 🥈 **搜狗搜索（重要备选）** | `execute_code` + `httpx` → sogou.com | `httpx.get("https://www.sogou.com/web", params={"query": "..."})` | **无限制 ✅，推荐首选备选** |
-| 🥉 第三备选 | `execute_code` + `httpx` → baidu.com | `httpx.get("https://www.baidu.com/s", params={"wd": "..."})` | 需 zh-CN header，HTML结构复杂 |
-| 🥉 第四备选 | `execute_code` + `httpx` 直连官网/聚合站 | 用 execute_code 内 httpx 直接请求官网或第三方聚合站 | 部分站点JS渲染失败 |
-| 🥉 第五备选 | 直接 curl 学校官网 | `curl -sL "目标URL" -H "User-Agent: Mozilla/5.0"` | 部分站点JS渲染失败 |
+- 免费，返回 Markdown 格式正文
+- 对静态 HTML 站（zizzs 具体文章页、jseea.cn、admissions.cuhk.edu.cn）效果很好
+- 对 SPA 站（bkzs.tongji.edu.cn、bkzs.nju.edu.cn）失败 → 降级 browser
 
-当 web_search 返回 402/credit limit 时，按以下步骤处理：
-1. **尝试搜狗搜索**：用 `execute_code` 内 `httpx` 请求 `www.sogou.com/web`，搜狗返回静态 HTML，可提取搜索结果摘要和链接
-2. **⚠️ 搜狗可能触发反爬（302→antispider）**：实测搜狗频繁返回 302 重定向到 `sogou.com/antispider/`，导致无法提取结果。此时**跳过搜狗**，直接进入下一步
-3. **尝试百度搜索**：用 `execute_code` + `httpx` 请求 `www.baidu.com/s?wd=...`。百度返回 ~895KB HTML 且较少触发反爬。但 HTML 结构复杂，标题提取 regex 可能不匹配，摘要提取方式见 `references/baidu-search-extraction.md`
-4. 用 `execute_code` + `httpx` 或 `terminal` + `curl -o` 直连官网或第三方聚合站
-5. 对第三方聚合站（zizzs.com, gaokzx.com 等）同样用 curl 抓取（注意列表页可能 JS 渲染，但**具体文章页**通常可用）
-6. web_extract 不可用时禁用（与 Exa 同池）
-7. **所有搜索引擎均不可用时的终极兜底**：直接 curl 已知可用的静态 HTML 站点（admissions.cuhk.edu.cn, jseea.cn 等），这些站点不依赖搜索引擎索引。参考下方"关键站点 curl 兼容性表"
+### 🥈 降级：browser_navigate(本地 Chrome)
 
-**注意**：搜狗可能因反爬失效。此时 httpx/curl 直连以下已知可用的站点（按优先级）：Open-Meteo API > admissions.cuhk.edu.cn > jseea.cn 具体文章页 > zizzs.com 具体文章页 > 南京本地宝 > gaokzx.com。跳过已知为 SPA 的站点（bkzs.tongji.edu.cn, zizzs.com 列表页等）。
+```python
+# web_extract 失败时打开页面
+browser_navigate("https://bkzs.tongji.edu.cn/...")
+# 读完内容
+browser_eval("document.body.innerText")
+```
 
-### 关键站点 curl 兼容性表（基于实测）
+- 本地 Chrome 免费，过 JS 渲染和部分反爬
+- 比 web_extract 慢，只做降级用
+
+### ❌ 已废弃（不用了）
+
+| 工具 | 原因 |
+|------|------|
+| Exa (web_search/web_extract 默认后端) | key 已注释，换成 Parallel 免费 MCP |
+| SerpAPI | 脚本已删除 |
+| sogou.com 搜索 | 频繁触发反爬 302→antispider |
+| browser_navigate→Google | 太慢，Parallel 更快 |
+
+### 故障恢复链
+
+| 层级 | 工具 | 说明 |
+|------|------|------|
+| 🥇 首选 | `web_search(Parallel)` | 免费 MCP，秒出结果 |
+| 🥇 提取 | `web_extract(Parallel)` | 读正文，Markdown 干净 |
+| 🥈 搜索降级 | 换关键词再 `web_search(Parallel)` | 同一后端，不消耗额外配额 |
+| 🥈 提取降级 | `browser_navigate(本地Chrome)` + `eval body.innerText` | 过 JS 渲染/反爬 |
+| 🥉 终极降级 | `execute_code` + `httpx` 直连已知可用站点 | 见下方 curl 兼容性表 |
+
+### 关键站点 curl 兼容性表（httpx 直连降级用）
 
 | 站点 | URL | curl 兼容性 | 说明 |
 |------|-----|------------|------|
@@ -124,11 +143,11 @@ version: 5.21
 | ❌ **weather.com.cn** | `www.weather.com.cn/weather/101190101.shtml` | ❌ 已失效 | 数据 JS 动态加载，API 端点已被屏蔽 |
 | ❌ **南邮招生网** | `bkzs.njupt.edu.cn` | ❌ DNS 解析失败 | 域名无法解析 exit code 6 |
 
-> 发现 SPA 站点时，切换到第三方聚合站的具体文章页（zizzs.com 具体文章 ID）或直接用搜狗搜索（如可用）。搜狗也不可用时，利用已有缓存/已知信息补全。
+> 发现 SPA 站点时，切到 web_extract(Parallel) 或 browser_navigate 提取第三方聚合站的具体文章页（zizzs.com 具体文章 ID）。利用已有缓存/已知信息补全。
 
-### 兜底搜索策略：zizzs 具体文章页直接访问
+### 跳转直连：zizzs 具体文章页直接访问（终极降级用）
 
-当搜狗和 Exa 都不可用时，zizzs 的具体文章页是**最可靠**的中文聚合信息来源：
+当 Parallel 和浏览器都不可用时，zizzs 的具体文章页是已知可靠的中文聚合信息来源：
 
 ```bash
 # 直接访问已知可用的 zizzs 文章页（返回完整 HTML 内容）
@@ -142,28 +161,20 @@ curl -sL "https://www.zizzs.com/gk/qiangjijihua/222279.html" -H "User-Agent: Moz
 
 无法精确知道 ID 时，搜索已被搜索引擎收录的页面标题在本地缓存中搜，或尝试访问主流聚合站首页（gaokzx.com, gaokaozhitongche.com）——这些首页通常是静态 HTML。
 
-### 搜狗搜索使用示例
+### web_search(Parallel) 搜索示例
 
 ```python
-import httpx, re
+# 🥇 首选 — web_search(Parallel 免费 MCP)
+web_search("同济大学 2026 强基计划 初试 安排")
+# 返回 5 条结果，含标题/URL/摘要
+# 摘要不够用时用 web_extract 读正文
+web_extract(["https://www.zizzs.com/gk/qiangjijihua/222279.html"])
 
-headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ..."}
-resp = httpx.get("https://www.sogou.com/web", params={
-    "query": "同济大学 2026 强基计划 初试 安排"
-}, headers=headers, timeout=15)
-
-# 提取搜索结果摘要
-snippets = re.findall(r'<p class="str[^"]*"[^>]*>(.*?)</p>', resp.text, re.DOTALL)
-for s in snippets[:5]:
-    clean = re.sub(r'<[^>]+>', '', s).strip()
-    print(clean)
-
-# 提取结果标题和链接
-titles = re.findall(r'<h3[^>]*>(.*?)</h3>', resp.text, re.DOTALL)
-links = re.findall(r'<a[^>]*href="(https?://[^"]*)"[^>]*class="[^"]*"[^>]*>', resp.text)
+# 如果 Parallel 搜索偶发超时，换关键词再试即可
+# 同一后端，不消耗额外配额
 ```
 
-**关键优势**：搜狗是中文搜索引擎，对高考/强基/综评等中国高考关键词的覆盖率远超直连单个网站。即使目标高校官网是 SPA（如同济招生网），搜狗搜索结果页仍是静态 HTML，可稳定提取摘要。同时支持 `site:` 过滤（如 `site:zs.njupt.edu.cn 综评 笔试`）。
+**关键优势**：Parallel 是 AI-optimized 搜索引擎，对中英文关键词都覆盖好。搜索结果摘要已包含发布时间和来源，比手动开浏览器快得多。
 
 ### curl 解析 HTML 的安全限制工作区
 
@@ -364,16 +375,14 @@ lark-cli im +messages-send --chat-id "${FEISHU_HOME_CHANNEL}" ...
 - ⚠️ **聚合站点优先于官方页面**：部分高校的政策更新在官方招生网发布延迟，但第三方聚合/解读站点（如 zizzs.com、gk100.com、jszs.com）会先出分析文章。搜索时不要只依赖官方来源——这些聚合站经常有更及时的政策变化解读。发现不一致信息时，应多方交叉验证
 - ⚠️ **官方通知页面可能是 JS 渲染 SPA，curl 无法提取文本**：部分高校（如同济大学）的官方通知/公告页面使用 Vue/React SPA 架构，`curl -sL` 仅能获取空 HTML 壳（CSS 和 JS 链接），无法提取正文内容。遇到此类页面时：
   1. 不要反复尝试 curl（页面本身没有静态文本）
-  2. **首选用搜狗搜索找第三方转载**：用 execute_code + httpx 请求 sogou.com，搜索通知标题关键词（如"同济大学 2026 初试安排"），搜狗结果页是静态 HTML 可直接提取摘要
-  3. 找到第三方聚合站（zizzs.com、gaokzx.com、gaokaozhitongche.com）的转载/摘要文章后，用 curl 抓取（注意：部分聚合站也可能 JS 渲染，此时搜狗搜索的摘要片段就是最可靠的来源）
-  4. 如果第三方也找不到，搜索「通知标题关键词 + 发布平台」（如「同济大学 2026 强基 初试安排 自主选拔在线」）
+  2. **用 web_search(Parallel) 搜通知标题关键词**（如"同济大学 2026 初试安排"），摘要已包含结果
+  3. 找到第三方聚合站（zizzs.com、gaokzx.com、gaokaozhitongche.com）的转载/摘要文章后，用 web_extract 提取
+  4. web_extract 失败（SPA）则 browser_navigate 打开
   ```bash
   # ✅ 正确做法
   curl -sL "https://www.zizzs.com/gk/qiangjijihua/222279.html" -o /tmp/page.html
   ```
-  **注意**：JS 渲染问题不仅限于天气/气象网站，各高校招生官网的通知页也越来越普遍地采用 SPA 架构。每次搜索时如发现 curl 结果只有 CSS/JS 代码，立即切换到第三方聚合站路径。搜狗搜索（静态 HTML 搜索结果页）是稳定的信息来源，但搜狗也可能触发反爬（302→antispider）——此时直接用 curl 访问已知可用聚合站的具体文章页（见上方兼容性表）。
-- ⚠️ **web_search (Exa) 可能因额度耗尽(402)失败**：web_extract 共享同一后端，同时不可用。此时按故障恢复链依次尝试搜狗搜索、百度搜索（详见 `references/baidu-search-extraction.md`）、execute_code + httpx 直连官网/聚合站，或直接用 curl 抓取目标页面 HTML
-- ⚠️ **curl | python3 管道阻塞**：安全策略阻止 `curl ... | python3 -c "..."`。正确流程：`curl -o /tmp/f.html` → `execute_code` 中 `open('/tmp/f.html')` 读取解析
+  **注意**：JS 渲染问题不仅限于天气/气象网站，各高校招生官网的通知页也越来越普遍地采用 SPA 架构。每次搜索时如发现 curl 结果只有 CSS/JS 代码，立即切到 web_extract(Parallel) 或 browser_navigate。
 - ⚠️ **校测日期冲突预警**：每次运行第一优先级搜索后，立即检查四条路径中任意两条的校测是否安排在同一天。
   - **当前已知冲突**：**同济强基初试（6/13下午14:00-16:30）与港中深机考（6/13下午14:00起）完全重叠**，考生需二选一。南大兴趣类校测（6/28）单独安排，不与志愿填报冲突。
   - ⚠️ **关键陷阱：官方通知可改变此前报道的时间安排**。5月曾报道同济初试为上午9:00-11:30（与港中深下午不冲突），但6月3日同济官方初试安排通知将其**改为下午14:00-16:30**，导致直接冲突。**不要假定"之前不冲突"的状态是永久的**——每次搜索时必须从最新官方通知中重新验证所有校测时间，尤其在考前2周内各校密集发布准考证/安排通知时。
