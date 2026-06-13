@@ -36,15 +36,36 @@ metadata:
    - `web_search(Parallel)` → 秒出结果，搜各新闻关键词
    - `web_extract(Parallel)` → 直接读正文（免费、快、Markdown 干净）
    - 提取失败（反爬/JS） → `browser_navigate(本地Chrome)` + `eval body.innerText`
-   - **每场比赛至少精读 8-12 篇赛前分析**，web_extract 速度快不费力，可以多看
+   - **每场比赛至少精读 12-15 篇赛前分析**，web_extract 速度快不费力，可以多看
    - 必须覆盖的新闻类型：
-     · 2-3 篇赛前战报/前瞻（了解整体格局）
-     · 2-3 篇战术分析（阵型对位、关键对位）
-     · 2-3 篇伤病/阵容更新（确认首发、谁缺席）
-     · 1-2 篇教练发布会报道（原话往往藏信号）
-     · 1-2 篇赔率/盘口分析（市场怎么看）
-   - 搜索关键词示例：`{队A} vs {队B} 2026 World Cup preview`、`{队A} injury`、`{队名} formation tactics`、`{教练名} press conference`
+     · 3-4 篇赛前战报/前瞻（了解整体格局，来源多样化）
+     · 2-3 篇战术分析（阵型对位、关键对位、弱侧利用）
+     · 2-3 篇伤病/阵容更新（确认首发、谁缺席、恢复情况）
+     · 2-3 篇教练发布会报道（原话往往藏信号，交叉验证）
+     · 1-2 篇赔率/盘口分析（市场怎么看、资金流向）
+     · 1-2 篇当地媒体/球迷社区反应（更衣室氛围、士气信号）
+   - 搜索策略：不只看 SI/Guardian/Goal 这类大媒体，还要搜以下维度：
+     · **当地媒体**（墨西哥/美国/加拿大本地记者）— 更早爆出首发/伤病
+     · **战术数据站**（The Athletic、Total Football Analysis）
+     · **博彩/赔率分析站**（Oddschecker、BettingSites）
+     · **社媒反应**（X/Twitter 关键词：`site:x.com {队名} {关键词}`）
+   - 搜索关键词示例：
+     · `{队A} vs {队B} 2026 World Cup preview tactics formation`
+     · `{队A} predicted lineup injury latest`
+     · `{教练名} press conference {队名} pre-match`
+     · `{队A} {队B} odds analysis sharp money`
+     · `site:x.com {队A} lineup leak starting XI`
    - **禁止只看 web_search 摘要就下结论**——必须用 web_extract 读了原文再评分
+
+④.5 **对照本地实体库，交叉验证**
+   - 读 `~/wc2026/entities/{队A}.md` 和 `~/wc2026/entities/{队B}.md`
+   - 对比新搜到的信息 vs 本地已有数据：
+     · 阵容/伤病有没有更新？
+     · 之前记录的战术分析是否还适用？
+     · 热身赛数据是否与最新报道一致？
+     · 发现矛盾 → 以最新、最权威的来源为准，在 entity 中标记待更新
+   - 更新 entity 页：将新发现的有价值信息追加到对应条目的「最新动态」区
+   - **搜到的信息必须与本地数据交叉验证后才能用于评分**
 ⑤ 🌤️ 露天场馆天气 → Open-Meteo API（免费，无需key），坐标查 references/mexico-venue-coordinates.md
 ⑥ 10维度评分 + 特殊情景修正 + 净需求分析
 ⑦ 输出预测报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
