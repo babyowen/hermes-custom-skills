@@ -274,7 +274,7 @@ terminal(command="cat <文件路径> | lark-cli docs +update --doc <token> --mar
 
 | 类别 | ❌ 别这么干 | ✅ 应该怎么做 |
 |:----|:-----------|:------------|
-| 📡 搜索 | Exa 额度用完了不换方案 | 用 httpx 直连源站或 Wikipedia API：`execute_code` + `httpx.get()` |
+| 📡 搜索 | 搜索提取链路 | 按标准链路：web_search(Parallel)→web_extract→降级browser |
 | 📡 搜索 | curl 硬爬被 WAF 挡 | 换 browser_navigate（完整浏览器渲染），或用搜索结果摘要代替 |
 | 📝 飞书 | `lark-cli docs +update` 不加 `--mode` | 必须加 `--mode overwrite`（全量覆盖）或对应模式 |
 | 📝 飞书 | 用 `patch` 改飞书导出的文件 | **绝对禁止**——引号转义会逐层恶化，用 `write_file` 全文覆盖 |
@@ -287,8 +287,7 @@ terminal(command="cat <文件路径> | lark-cli docs +update --doc <token> --mar
 > 完整 26 条陷阱清单见 `references/已知陷阱清单.md`
 
 **❗已知陷阱**
-0. **⚠️ Exa API 额度耗尽→百度/Wikipedia/httpx 搜索回退**：`web_search` 和 `web_extract` 共享同一个 Exa API 后端，额度用完后所有搜索均返回 402 错误。此时使用 `execute_code` + `httpx` 直连源站或 Wikipedia API 作为回退方案。
-   可通过 `execute_code` 调用。`httpx` 无需 API key，免费无限使用。
+0. **⚠️ 搜索链路（Parallel 免费 MCP）**：搜索走 web_search(Parallel)，提取走 web_extract(Parallel)，提取失败降级 browser_navigate(本地Chrome) + eval body.innerText。全部免费。
 
 1. **`--mode` 参数必填陷阱**：`lark-cli docs +update` 必须带 `--mode overwrite`（全量覆盖）或对应模式。如果缺了 `--mode`，命令静默失败报 `--mode is required`，不会更新飞书文档。写 cron job 前务必验证该命令可用。
 2. **本地缓存文件不存在陷阱**：`references/热点素材库.md` 等标记为"以此为缓存"的文件可能不存在于磁盘上。首次运行时需要用 `lark-cli docs +fetch --doc <token> --format pretty > references/<filename>` 创建缓存。飞书更新后**必须**同步保存本地缓存，否则下次运行读取到的是过时版本。
