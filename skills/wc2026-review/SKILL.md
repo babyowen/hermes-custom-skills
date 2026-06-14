@@ -17,8 +17,8 @@ tags: [wc2026, world-cup, review, post-match, iteration]
 
 ## 核心流程
 
-```
-① 获取前一天赛果 — FotMob browser_navigate / web_search(比分)
+```text
+① 获取赛果 — Odds API via web_extract / web_search(比分) / FotMob browser
 ①.5 赛后新闻采集 — web_search + web_extract + browser_navigate
 ② 对比预测 — 将实际结果与系统预测进行逐场对比
 ③ 偏差分析 — 按10维度逐一排查
@@ -46,9 +46,9 @@ wc2026/reviews/
 获取前一天已结束比赛的比分。所有工具必须 cron 安全。
 
 **工具优先级（全部 cron 安全）**：
-1. 🥇 **FotMob browser** — `browser_navigate("fotmob.com/leagues/77/fixtures/world-cup")` 查看 fixture 列表，已完成比赛显示最终比分
+1. 🥇 **The Odds API via web_extract** — `web_extract("https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/scores/?apiKey=e957983e5449073eedc1e6fafc619a74&daysFrom=1")` 返回已完成比赛的最终比分。⚠️ 返回的 `scores` 是 `[{"name": "Mexico", "score": "2"}, {"name": "South Africa", "score": "0"}]` 格式的列表，不是字典。从返回的 markdown 文本中解析比分。
 2. 🥈 **web_search** — 搜 `"{队A} vs {队B} 2026 World Cup score result"`，Parallel 免费 MCP 的结果摘要通常已包含比分
-3. 🥉 **web_extract** — 提取赛后战报页面确认比分详情
+3. 🥉 **FotMob browser** — `browser_navigate("fotmob.com/leagues/77/fixtures/world-cup")` 查看已完成比赛的最终比分
 
 **获取进球详情**：
 - 用 `web_search("{队A} vs {队B} 2026 World Cup goal scorers")`
@@ -250,7 +250,8 @@ web_search("{比赛名} World Cup 2026 group standings after match")
 ## Pitfalls
 
 - **🚫 禁止使用 execute_code 和 terminal（curl）**：这两个工具在 cron 模式下会返回 `pending_approval` 或 `BLOCKED`，导致 agent 卡死。所有数据获取必须用 `web_search` → `web_extract` → `browser_navigate` 链路。
-- **Parallel 免费 MCP 获取比分和进球详情**：搜比赛名+score 或 goal scorers，Parallel 摘要通常已有比分/进球者+时间，不足则 web_extract 读，再不行 browser→Google
+- **Odds API 使用 web_extract 调用**：`web_extract("https://api.the-odds-api.com/...")` 是 cron 安全的，返回文本中可直接解析比分。注意 API 返回的 `scores` 是 `[{"name": "Mexico", "score": "2"}]` 数组格式，不是 `{"home": "2", "away": "0"}` 字典。
+- **Parallel 免费 MCP 获取进球详情**：搜比赛名+goal scorers，Parallel 摘要通常已有比分/进球者+时间，不足则 web_extract 读，再不行 browser→Google
 - **SerpAPI/Exa 均已废弃**：SerpAPI 脚本已删除，Exa key 已注释。搜和提取全部走 Parallel 免费 MCP 降级 browser 链路。
 - **赛后必须同步伤病追踪表**：红牌球员必须在 `concepts/伤病追踪总表.md` 中标记为 ❌ 停赛。这是复盘流程中容易遗漏的步骤。
 - **预测记录查找**：`session_search` 可能找不到之前的赛前预测输出。备选方案是直接读 match pages 中的「系统预测」区块（每个 match page 的 🤖 部分包含完整评分+预测概率+推荐比分）。
