@@ -1,7 +1,7 @@
 ---
 name: wc2026-review
 description: "WC2026世界杯赛后复盘系统。每天中午自动查询前一天比赛结果，对比系统预测，分析偏差原因，自动迭代预测方法论。"
-version: 1.1.0
+version: 1.2.0
 tags: [wc2026, world-cup, review, post-match, iteration]
 ---
 
@@ -9,24 +9,26 @@ tags: [wc2026, world-cup, review, post-match, iteration]
 
 ## 概述
 
-在 `wc2026-predictor` skill 生成赛前预测的基础上，在**比赛结束后随时**（不限于 12:00 cron）对已结束的比赛进行**结果确认 → 预测对比 → 偏差分析 → 方法论迭代**的完整闭环。
+在 `wc2026-predictor` skill 生成赛前预测的基础上，在**比赛结束后随时**对已结束的比赛进行**结果确认 → 预测对比 → 偏差分析 → 方法论迭代**的完整闭环。
 
-**核心原则**：已结束的比赛随时可复盘，不需要等定时 cron。用户告知比赛已结束、或手动触发时立即执行。cron 12:00 只是每日例行跑，期间结束的比赛随时可单独复盘。
+**核心原则**：已结束的比赛随时可复盘，不需要等定时 cron。用户告知比赛已结束、或手动触发时立即执行。cron 12:00 只是每日例行跑。
+
+**⚠️ Cron 安全须知**：本 skill 在 cron 模式下执行，**禁止使用 `execute_code` 和 `terminal`（调 curl/wget 等）**，这些工具在 cron 模式会被 blocked。所有数据获取必须用 **`web_search` → `web_extract` → `browser_navigate`** 链路。
 
 ## 核心流程
 
 ```
-① 获取前一天赛果 — FotMob browser / The Odds API / Football365 curl
-①.5 赛后新闻采集 — 每场 100 篇，Parallel 免费 MCP + web_extract 降级 browser
+① 获取前一天赛果 — FotMob browser_navigate / web_search(比分)
+①.5 赛后新闻采集 — web_search + web_extract + browser_navigate
 ② 对比预测 — 将实际结果与系统预测进行逐场对比
-③ 偏差分析 — 按10维度逐一排查：哪个维度看错了？
-④ 方法论迭代 — 将发现的偏差写入 accuracy-tracking 和 lessons-learned
-⑤ 输出复盘报告 → 写入临时文件并 lark-cli --markdown 推送，回复简短确认
+③ 偏差分析 — 按10维度逐一排查
+④ 方法论迭代 — 写入 accuracy-tracking 和 lessons-learned
+⑤ 输出复盘报告
 ```
 
 ## 数据存储
 
-赛后复盘数据存储在 `~/wc2026/reviews/` 目录。**首次运行时需先创建该目录**（`mkdir -p ~/wc2026/reviews/match-reports`）：
+赛后复盘数据存储在 `~/wc2026/reviews/` 目录：
 
 ```
 wc2026/reviews/
@@ -41,16 +43,22 @@ wc2026/reviews/
 
 ### 第一步：获取赛果
 
-从 FotMob fixtures 页面或 The Odds API 获取前一天已结束比赛的比分。
+获取前一天已结束比赛的比分。所有工具必须 cron 安全。
 
-**工具优先级**：
-1. 🥇 **The Odds API**（`soccer_fifa_world_cup`）— 返回已完成比赛的最终比分（`completed`状态）
-2. 🥈 **web_search(Parallel) → 搜 goal scorers** — 免费 MCP 秒搜，摘要通常已包含进球者+时间
-3. 🥉 **FotMob browser** — 逐个检查比赛详情页的最终比分
+**工具优先级（全部 cron 安全）**：
+1. 🥇 **FotMob browser** — `browser_navigate("fotmob.com/leagues/77/fixtures/world-cup")` 查看 fixture 列表，已完成比赛显示最终比分
+2. 🥈 **web_search** — 搜 `"{队A} vs {队B} 2026 World Cup score result"`，Parallel 免费 MCP 的结果摘要通常已包含比分
+3. 🥉 **web_extract** — 提取赛后战报页面确认比分详情
+
+**获取进球详情**：
+- 用 `web_search("{队A} vs {队B} 2026 World Cup goal scorers")`
+- Parallel 免费 MCP 的搜索结果摘要通常直接包含进球者和时间
+- 摘要不足时 `web_extract` 读正文
+- 都失败再 `browser_navigate` → Google 体育知识面板
 
 ### ①.5 赛后新闻采集（每场 100 篇，为偏差分析提供依据）
 
-用 Parallel 免费 MCP 批量搜索每场已结束比赛的赛后新闻，按以下维度分布：
+用 web_search(Parallel) 批量搜索每场已结束比赛的赛后新闻，按以下维度分布：
 
 | 维度 | 篇数 | 目的 |
 |:----|:----|:----|
@@ -77,35 +85,7 @@ web_search("{队A} vs {队B} player ratings man of the match")
 web_search("{比赛名} World Cup 2026 group standings after match")
 ```
 
-提取方式：`web_extract(Parallel)` → 失败降级 `browser_navigate(本地Chrome)`。全部免费，搜索+提取一场比赛约 5 分钟。
-
-```python
-# 示例：从 The Odds API 获取已结束比赛
-# ⚠️ 注意：scores 是 [{"name": team, "score": "X"}] 列表，不是字典！
-import httpx
-resp = httpx.get("https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/scores/?apiKey=e957983e5449073eedc1e6fafc619a74&daysFrom=1", timeout=15)
-scores = resp.json()
-for m in scores:
-    if m.get('completed'):
-        score_list = m.get('scores', [])
-        hs = score_list[0]['score'] if len(score_list) > 0 else '?'
-        as_ = score_list[1]['score'] if len(score_list) > 1 else '?'
-        print(f"{m['home_team']} {hs} - {as_} {m['away_team']}")
-```
-
-### 获取进球详情
-
-The Odds API 只返回比分，不返回进球者/时间。获取详情的方法：
-
-**web_search(Parallel) → 搜 goal scorers（免费、秒出）**：
-```python
-# 搜索 "{队A} vs {队B} 2026 World Cup goal scorers"
-# Parallel 免费 MCP 的搜索结果摘要通常直接包含进球者和时间
-# 摘要不足时 web_extract(Parallel) 读正文
-# 都失败再 browser_navigate→Google 体育知识面板
-web_search("South Korea vs Czech 2026 World Cup goal scorers")
-```
-**实测效果**：Parallel 免费 MCP 搜索结果摘要通常已包含进球详情，无需点开文章。比 browser_navigate 快得多。
+提取链路：`web_extract(Parallel)` → 失败降级 `browser_navigate(本地Chrome)`。全部免费 cron 安全。
 
 ### 第二步：对比预测
 
@@ -196,9 +176,9 @@ web_search("South Korea vs Czech 2026 World Cup goal scorers")
 
 ### 第五步：更新文件（赛后数据同步）
 
-每场已结束的比赛，按以下流程更新所有相关文件：
+每场已结束的比赛，按以下流程更新所有相关文件。文件操作使用 `patch` 或 `write_file`（cron 安全）。
 
-**① 更新 match page**
+**① 更新 match page**（用 patch 修改 YAML frontmatter）
 - 修改 frontmatter: `status: finished`, 添加 `result: X-Y`, `goals_home: ...`, `goals_away: ...`, `red_cards: ...`
 - 追加赛后复盘区块（预测vs实际对比、进球详情、比赛回顾、出线形势影响）
 
@@ -259,18 +239,18 @@ web_search("South Korea vs Czech 2026 World Cup goal scorers")
 
 ## Cron 配置
 
-每天 12:00（北京时间）运行，加载 `wc2026-predictor` + `wc2026-review` 两个 skill。由于每场需采集 100 篇赛后新闻，运行时间约 5-10 分钟。
+每天 12:00（北京时间）运行，只加载 `wc2026-review` 一个 skill（不加载 wc2026-predictor，避免 context 过大导致 Broken pipe）。
 
 ```yaml
 定时: 0 12 * * *
-技能: [wc2026-predictor, wc2026-review]
+技能: [wc2026-review]
 投递: origin
 ```
 
 ## Pitfalls
 
-- **Odds API scores 是列表而非字典**：`m.get('scores')` 返回的是 `[{"name": "Mexico", "score": "2"}, {"name": "South Africa", "score": "0"}]` 格式的列表，不是 `{"home": "2", "away": "0"}` 字典。示例代码中的 `.get('home')` 会抛出 AttributeError。正确写法：`score_list = m.get('scores', []); hs = score_list[0]['score'] if len(score_list) > 0 else '?'`
-- **Parallel 免费 MCP 获取进球详情**：搜比赛名+goal scorers，Parallel 摘要通常已有进球者+时间，不足则 web_extract 读，再不行 browser→Google
+- **🚫 禁止使用 execute_code 和 terminal（curl）**：这两个工具在 cron 模式下会返回 `pending_approval` 或 `BLOCKED`，导致 agent 卡死。所有数据获取必须用 `web_search` → `web_extract` → `browser_navigate` 链路。
+- **Parallel 免费 MCP 获取比分和进球详情**：搜比赛名+score 或 goal scorers，Parallel 摘要通常已有比分/进球者+时间，不足则 web_extract 读，再不行 browser→Google
 - **SerpAPI/Exa 均已废弃**：SerpAPI 脚本已删除，Exa key 已注释。搜和提取全部走 Parallel 免费 MCP 降级 browser 链路。
 - **赛后必须同步伤病追踪表**：红牌球员必须在 `concepts/伤病追踪总表.md` 中标记为 ❌ 停赛。这是复盘流程中容易遗漏的步骤。
 - **预测记录查找**：`session_search` 可能找不到之前的赛前预测输出。备选方案是直接读 match pages 中的「系统预测」区块（每个 match page 的 🤖 部分包含完整评分+预测概率+推荐比分）。
