@@ -6,9 +6,42 @@ A股收盘日报生成器 V3
 
 import subprocess, json, os, re, time, sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from duckduckgo_search import DDGS
+
+# ==================== A股交易日历 ====================
+# 2026年沪深北交易所节假日休市安排
+# 来源：沪深北交易所公告（2025-12-22发布）
+_HOLIDAYS_2026 = [
+    # 元旦：1月1日(四) ~ 1月3日(六)
+    (date(2026,1,1), date(2026,1,3)),
+    # 春节：2月14日(六) ~ 2月23日(一)  [2/14周六连续休假]
+    (date(2026,2,14), date(2026,2,23)),
+    # 清明节：4月4日(六) ~ 4月6日(一)
+    (date(2026,4,4), date(2026,4,6)),
+    # 劳动节：5月1日(五) ~ 5月5日(二)
+    (date(2026,5,1), date(2026,5,5)),
+    # 端午节：6月19日(五) ~ 6月21日(日)
+    (date(2026,6,19), date(2026,6,21)),
+    # 中秋节：9月25日(五) ~ 9月27日(日)
+    (date(2026,9,25), date(2026,9,27)),
+    # 国庆节：10月1日(四) ~ 10月7日(三)
+    (date(2026,10,1), date(2026,10,7)),
+]
+
+def is_trading_day(d: date = None) -> bool:
+    """判断给定日期是否为A股交易日"""
+    if d is None:
+        d = date.today()
+    # 周末休市
+    if d.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+    # 节假日休市
+    for start, end in _HOLIDAYS_2026:
+        if start <= d <= end:
+            return False
+    return True
 
 MX_DATA = os.path.expanduser("~/.hermes/skills/mx-data/mx_data.py")
 MX_SEARCH = os.path.expanduser("~/.hermes/skills/mx-search/mx_search.py")
@@ -387,6 +420,12 @@ def generate(indices, stats, extremes, news_data, special_data):
 # ==================== 主流程 ====================
 
 def main():
+    # 检查是否为交易日
+    if not is_trading_day():
+        msg = f"🛑 {today} 非交易日（周末或节假日），跳过日报生成。"
+        print(msg)
+        return msg
+
     print(f"🔄 A股收盘日报 · {today}\n")
     print("📡 正在采集数据...\n")
 

@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "你是 A 股收盘日报生成系统。按 a-stock-closing-analysis skill 的完整流程执行：运行脚本 ~/.hermes/skills/a-stock-closing-analysis/scripts/closing_report.py 生成今日收盘日报，然后交付完整报告。",
+    "expected": "完整10模块报告：大盘扫描→板块热力→聪明钱→估值体检→异常信号→异动扫描→特别关注→其他要闻→盘后小结"
+  },
+  {
+    "id": 2,
+    "prompt": "你是 A 股收盘日报生成系统。按 a-stock-closing-analysis skill 执行。注意 mx-search 可能不可用，需要降级到 DuckDuckGo 回退方案继续完成报告。",
+    "expected": "降级运行但仍产出完整报告，标注⚠️降级标识"
+  },
+  {
+    "id": 3,
+    "prompt": "你是 A 股收盘日报生成系统。今天是周六（非交易日），是否需要运行收盘日报？",
+    "expected": "判断为非交易日，跳过执行或输出无需生成报告的提示"
+  }
+]

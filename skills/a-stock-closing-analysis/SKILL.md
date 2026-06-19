@@ -2,7 +2,7 @@
 name: a-stock-closing-analysis
 display_name: A股收盘日报
 title: A股收盘日报分析
-description: 每日16:00自动生成A股收盘日报，覆盖大盘扫描、涨跌分布、涨停聚焦、资金风向、异动扫描、极端值看点、市场要闻等模块。基于东方财富妙想三个mx技能提供数据。
+description: 每日16:00自动生成A股收盘日报，覆盖大盘指数、涨跌分布、涨停聚焦、资金成交额、异动扫描（涨跌幅/换手/量能/极值）、特别关注、市场要闻、盘后小结。基于东方财富妙想mx系列技能提供实时数据。
 author: Hermes
 version: 1.4.0
 required_env_vars:
@@ -21,9 +21,9 @@ credentials:
 
 **核心原则：不堆数据，讲人话。** 目标是让任何一个普通人都能：
 1. 一眼看懂今天市场发生了什么
-2. 知道现在整体是便宜还是贵
-3. 了解外资在干嘛
-4. 得到一个明确的判断和提醒
+2. 看到涨跌分布和资金聚集方向
+3. 关注到值得注意的异动和新闻
+4. 得到一个情绪判断
 
 ### 数据源变更
 
@@ -35,18 +35,20 @@ credentials:
 - **⚠️ 注意**：DuckDuckGo 在腾讯云服务器上返回质量极差（中文结果为空/不相关）+ 容易触发验证码，仅做 fallback，不要依赖
 - 行情数据（mx-data）和选股数据（mx-xuangu）仍使用 mx 系列
 
-### 模块结构（按报告顺序）
+### 模块结构（实际产出）
 
-1. **一句话看懂今天** — 大白话总结：涨跌方向 + 板块特征 + 资金特征
-2. **大盘数据** — 指数涨跌 + 涨跌分布
-3. **🔥 板块热力图** — 涨跌行业 TOP3 + 资金流向解读（基于 mx-xuangu + lixinger）
-4. **💰 聪明钱在干嘛** — 北向资金 + 融资融券 + 龙虎榜机构 三信号交叉验证（基于 lixinger）
-5. **📊 估值体检** — 沪深300/创业板/科创50 PE+历史分位（基于 lixinger）
-6. **⚡ 今日异常** — 大宗交易/板块异动/资金转向等异常信号（基于 lixinger，无异常则跳过）
-7. **异动扫描** — 涨跌幅/换手/量能/极值 TOP5
-8. **🔥 今日特别关注** — 有特点的新闻：股价创纪录、新股异动、历史级行情、个股故事（独立搜索）
-9. **📢 其他要闻** — 当日常规重要资讯
-10. **盘后小结** — 今天怎么看 + 明天注意什么
+脚本实际生成以下模块，按报告顺序排列：
+
+| Step | 模块 | 数据源 | 说明 |
+|:----:|:----|:-------|:-----|
+| 1 | **大盘指数+涨跌分布** | mx-data + mx-xuangu | 5大指数涨跌幅 + 涨停/跌停/涨跌幅>5%统计 |
+| 2 | **涨停聚焦+资金聚焦** | mx-xuangu | 涨停个股列表 + 成交额TOP3 |
+| 3 | **异动扫描** | mx-xuangu + 极值缓存 | 涨跌幅/换手/量能TOP5 + 市值/市盈极值 |
+| 4 | **特别关注** | mx-search | 突破新高/新股暴涨/创纪录等独立搜索 |
+| 5 | **其他要闻** | mx-search | 当日市场重要资讯 |
+| 6 | **盘后小结** | 模板 | 情绪判断+明日关注 |
+
+> **关于缺失模块**：板块热力图、北向资金/融资融券/龙虎榜（聪明钱）、指数估值体检、异常信号检测等模块因依赖 lixinger API 集成，当前脚本尚未实现。如需增加请告知。
 
 ## 依赖
 
@@ -62,14 +64,6 @@ credentials:
 - 搜索词见 `closing_report.py` 中 `q_news()` 和 `q_special()`
 - 用量：每交易日2次，mx 共用同一配额（日报总计 ~18次/日，远低于50次限额）
 - 回退方案：DuckDuckGo（`region='cn-zh'`），但腾讯云上中文结果质量差，仅做备胎
-
-### 补充数据源（lixinger — 基本面深度分析）
-
-- `lixinger` skill（理杏仁官方 API v1.0.3）
-- 补充 mx 不具备的数据：**指数/行业 PE/PB 历史分位**、**北向资金**、**融资融券**
-- 调用方式：`curl -s --compressed -X POST "https://open.lixinger.com/api/{endpoint}" -H "Content-Type: application/json" -d '{"token":"$(cat ~/.hermes/skills/lixinger/token.json | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")",...}'`
-- 限流：每秒 36 次 / 分钟 1000 次，远宽于 mx 的限额，无需特殊避让
-- **⚠️ 注意**：必须用 `open.lixinger.com` 子域名，`www` 返回 HTML
 
 ## 输出格式要点
 
@@ -106,11 +100,6 @@ credentials:
 - `mx-xuangu` → `data.data.allResults.result.dataList`
 - `mx-xuangu` 总数 → `data.data.allResults.result.total`
 - `mx-search` 资讯 → `data.data.llmSearchResponse.data`（每个 item 含 `title`, `content`, `date`, `source`, `jumpUrl`）
-
-lixinger 返回结构统一为 `{"code": 1, "data": [...]}`，`code=1` 表示成功：
-- 估值数据：`data[0].pe_ttm`, `data[0].pe_ttm.y3.cvpos`（近3年分位）
-- 热度数据：`data[0].last_data_date`, `data[0].mtaslb_last`（融资余额）
-- 财务报表：`data[0].q.ps.toi.t`（嵌套结构, q→ps→toi→t）
 
 ## 使用方式
 
