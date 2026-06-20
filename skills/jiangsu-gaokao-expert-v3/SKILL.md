@@ -2,7 +2,7 @@
 name: jiangsu-gaokao-expert-v3
 description: "江苏高考决策情报日报 V5 — 家长视角精确定位版"
 author: Hermes
-version: 5.22
+version: 5.23
 ---
 
 # 江苏高考决策情报日报 V5
@@ -72,9 +72,9 @@ version: 5.22
 
 ## ⚠️ 搜索链路（新标准）
 
-**统一使用 Parallel 免费 MCP + 本地 Chrome 降级链路：**
+**双引擎搜索策略：Parallel MCP 主搜 + Google 浏览器验证**
 
-### 🥇 搜索：web_search(Parallel 免费 MCP)
+### 🥇 主搜：web_search(Parallel 免费 MCP)
 
 ```python
 # 搜关键词，秒出结果
@@ -84,6 +84,23 @@ web_search("南京大学 综合评价 地理科学类 2026")
 - 免费、零配置、中英文都能搜
 - 支持 `site:` 过滤（如 `site:zhuanlan.zhihu.com 江苏 高考`）
 - 每次搜 5 个结果，摘要已包含发布时间和来源
+- **覆盖全部 15+ 个关键词**，快速广撒网
+
+### 🥇 验证：browser_navigate(Google) — 关键路径专用
+
+Parallel 搜完后，对**优先级最高的 5-6 个关键词**（第一优先级专属路径 + 第二优先级匹配学校），用 `browser_navigate` 到 Google 再搜一遍，确保不遗漏 Google 索引覆盖好但 Parallel 搜不到的内容。
+
+```python
+# 打开 Google 搜相同关键词
+browser_navigate("https://www.google.com/search?q=南京邮电大学+2026+综合评价+入围名单")
+# 读取搜索结果页面
+search_results = browser_console(expression="document.body.innerText")  # 或 browser_snapshot()
+```
+
+- Google 搜索结果比 Parallel 更全，但速度慢（需加载完整页面）
+- **只对关键路径做**：南邮入围结果、港中深成绩、南大校测、匹配学校招生计划变化
+- 对比两边结果：如果 Google 搜到了 Parallel 没搜到的新内容 → 优先提取
+- 如果两边结果一致 → 用 Parallel 的结果即可，不必重复提取
 
 ### 🥇 提取正文：web_extract(Parallel 免费 MCP)
 
@@ -121,9 +138,9 @@ browser_eval("document.body.innerText")
 
 | 层级 | 工具 | 说明 |
 |------|------|------|
-| 🥇 首选 | `web_search(Parallel)` | 免费 MCP，秒出结果 |
+| 🥇 主搜 | `web_search(Parallel)` | 免费 MCP，秒出结果，覆盖全部关键词 |
+| 🥇 验证 | `browser_navigate(Google)` | 对第一优先级关键词，用 Google 再搜一遍做交叉验证 |
 | 🥇 提取 | `web_extract(Parallel)` | 读正文，Markdown 干净 |
-| 🥈 搜索降级 | 换关键词再 `web_search(Parallel)` | 同一后端，不消耗额外配额 |
 | 🥈 提取降级 | `browser_navigate(本地Chrome)` + `eval body.innerText` | 过 JS 渲染/反爬 |
 | 🥉 终极降级 | `execute_code` + `httpx` 直连已知可用站点 | 见下方 curl 兼容性表 |
 
@@ -509,7 +526,8 @@ lark-cli im +messages-send --chat-id "${FEISHU_HOME_CHANNEL}" ...
 |------|------|------|
 | ▶️ 开始执行 | `[HH:MM:SS] ▶️ 开始执行` | 记录运行起始时间 |
 | 📖 读取发现 | `[HH:MM:SS] 📖 读取 key-discoveries.md` | |
-| 🔍 搜索 | `[HH:MM:SS] 🔍 搜索: "关键词"` | 每个搜索关键词一行，附结果摘要 |
+| 🔍 搜索 | `[HH:MM:SS] 🔍 搜索: "关键词"` | Parallel MCP 搜索，每个关键词一行，附结果摘要 |
+| 🔍 Google | `[HH:MM:SS] 🔍 Google: "关键词"` | browser_navigate 到 Google 验证，附结果和对比结论 |
 | 🔍 提取 | `[HH:MM:SS] 🔍 提取: URL` | web_extract 正文提取 |
 | 🌤️ 天气 | `[HH:MM:SS] 🌤️ Open-Meteo 天气查询` | 天气API调用 |
 | ✅ 决策 | `[HH:MM:SS] ✅ 决策: 路径→状态` | 附判断依据（为什么维持/为什么更新） |
@@ -543,12 +561,14 @@ lark-cli im +messages-send --chat-id "${FEISHU_HOME_CHANNEL}" ...
 
 2. **判断运行阶段并搜索**：根据当前日期在执行流程中施加不同的搜索策略
    - **日志记录**：对每个搜索关键词，记录 `[HH:MM:SS] 🔍 搜索: "关键词" <br/>→ 结果摘要（搜到X条、有无新发现、来源URL）`
+   - **日志记录**：对每次 Google 验证搜索，记录 `[HH:MM:SS] 🔍 Google: "关键词" <br/>→ 结果摘要（搜到X条、与 Parallel 对比结论）`
    - **日志记录**：对每次 web_extract 正文提取，记录 `[HH:MM:SS] 🔍 提取: URL <br/>→ 提取状态（成功/失败/无新内容）`
    - **日志记录**：对每次天气 API 调用，记录 `[HH:MM:SS] 🌤️ Open-Meteo 天气查询 <br/>→ 返回温度范围、降水概率`
 
    **A. 考前阶段（距离高考 ≥1天）** — 正常模式：
    按六维清单全力搜索，每次至少搜 15 个关键词。
    - 运行第 2 天+: 对于连续 2 次搜索返回相同结果的关键词，直接跳过（日志中标注"跳过：与上次相同"）
+   - **Parallel 搜完全部关键词后，对第一优先级关键词（各路径校测结果）用 browser_navigate 到 Google 再验证一次**
    - 用时间过滤 `2026年5月` `2026年` 等减少重复；官网招生栏目需每次扫一次
    - 搜索大学+招生时务必加"本科"关键词，避免研究生招生结果淹没
    - 每条路径的官网至少扫一次
