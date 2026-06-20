@@ -2,7 +2,7 @@
 name: jiangsu-gaokao-expert-v3
 description: "江苏高考决策情报日报 V5 — 家长视角精确定位版"
 author: Hermes
-version: 5.21
+version: 5.22
 ---
 
 # 江苏高考决策情报日报 V5
@@ -489,15 +489,66 @@ lark-cli im +messages-send --chat-id "${FEISHU_HOME_CHANNEL}" ...
 
 ## 执行流程
 
+### 📋 执行日志记录（每次执行必须）
+
+每次执行时，必须将执行过程按**时间线顺序**记录到飞书文档：
+- **文档 URL**: `https://zesyg4oxfe.feishu.cn/docx/N8eNdusOvoyMmAxUcY0c6YRpnOb`
+- **token**: `N8eNdusOvoyMmAxUcY0c6YRpnOb`
+- **身份**: `--as bot`
+- **命令**: `lark-cli docs +update --api-version v2 --doc "N8eNdusOvoyMmAxUcY0c6YRpnOb" --command append --as bot --content '<XML日志内容>'`
+
+**日志规则：**
+- 整个执行过程中，将日志内容逐条拼接到一个临时文件（如 `/tmp/gaokao_exec_log_YYYYMMDD.xml`）
+- 日志内容用 XML 格式拼接，每条记录一个 `<p>` 标签：`<p>[HH:MM:SS] 操作标识 说明</p>`
+- 执行结束后，用一次 `terminal()` 调用 cat 读取文件内容传给 `--content` 写入飞书文档
+- 日志不阻塞主流程——推送失败不影响日报生成和归档
+
+**操作标识（按执行顺序必录）：**
+
+| 操作 | 标识 | 说明 |
+|------|------|------|
+| ▶️ 开始执行 | `[HH:MM:SS] ▶️ 开始执行` | 记录运行起始时间 |
+| 📖 读取发现 | `[HH:MM:SS] 📖 读取 key-discoveries.md` | |
+| 🔍 搜索 | `[HH:MM:SS] 🔍 搜索: "关键词"` | 每个搜索关键词一行，附结果摘要 |
+| 🔍 提取 | `[HH:MM:SS] 🔍 提取: URL` | web_extract 正文提取 |
+| 🌤️ 天气 | `[HH:MM:SS] 🌤️ Open-Meteo 天气查询` | 天气API调用 |
+| ✅ 决策 | `[HH:MM:SS] ✅ 决策: 路径→状态` | 附判断依据（为什么维持/为什么更新） |
+| 📋 报告 | `[HH:MM:SS] 📋 日报正文完成` | |
+| 💾 归档 | `[HH:MM:SS] 💾 归档 GaokaoWIKI` | 日报归档 + wiki更新 |
+| 🔄 同步 | `[HH:MM:SS] 🔄 GitHub 同步` | |
+| 📤 推送 | `[HH:MM:SS] 📤 推送飞书群` | |
+| ✅ 结束 | `[HH:MM:SS] ✅ 执行结束` | |
+
+**示例日志内容（XML格式）：**
+```xml
+<h2>2026-06-21 08:30</h2>
+<p>[08:30:01] ▶️ 开始执行</p>
+<p>[08:30:02] 📖 读取 key-discoveries.md</p>
+<p>[08:30:05] 🔍 搜索: "南京邮电大学 2026 综合评价 入围名单 公示"<br/>→ 南邮综评栏目仅见测试公告和初审公示，无入围名单</p>
+<p>[08:30:10] 🔍 搜索: "南京邮电大学 2026 综合评价 笔试成绩 查询"<br/>→ 未搜到成绩查询入口相关文章</p>
+<p>[08:35:00] ✅ 决策: 南邮→维持"待公布"（搜了两组关键词均无新动态）</p>
+<p>[08:40:00] 📋 日报正文完成</p>
+<p>[08:40:30] 💾 归档 GaokaoWIKI</p>
+<p>[08:41:00] 🔄 GitHub 同步</p>
+<p>[08:42:00] 📤 推送飞书群</p>
+<p>[08:42:01] ✅ 执行结束</p>
+```
+
+> **推荐做法**：用 `execute_code` 中的 Python `open(path, 'a')` 逐条追加日志行到临时文件，最后一次性 `terminal()` 用 lark-cli 推送。
+
 1. **加载已知发现**：阅读 `~/GaokaoWIKI/references/key-discoveries.md`（GaokaoWIKI 仓库中的那份，不是 skill 目录下的），避免重复发现
    - ⚠️ skill 目录下也有一份 `references/key-discoveries.md`，那是初始模板/快照，不是最新数据
    - 每次运行都要读 **GaokaoWIKI 仓库中的** key-discoveries.md，因为那里会记录前一天的发现
+   - **→ 记录到执行日志：📖 读取 key-discoveries.md → 摘要（末次更新日期、最新发现概览）**
 
-2. **判断运行阶段**：根据当前日期在执行流程中施加不同的搜索策略
+2. **判断运行阶段并搜索**：根据当前日期在执行流程中施加不同的搜索策略
+   - **日志记录**：对每个搜索关键词，记录 `[HH:MM:SS] 🔍 搜索: "关键词" <br/>→ 结果摘要（搜到X条、有无新发现、来源URL）`
+   - **日志记录**：对每次 web_extract 正文提取，记录 `[HH:MM:SS] 🔍 提取: URL <br/>→ 提取状态（成功/失败/无新内容）`
+   - **日志记录**：对每次天气 API 调用，记录 `[HH:MM:SS] 🌤️ Open-Meteo 天气查询 <br/>→ 返回温度范围、降水概率`
 
    **A. 考前阶段（距离高考 ≥1天）** — 正常模式：
    按六维清单全力搜索，每次至少搜 15 个关键词。
-   - 运行第 2 天+: 对于连续 2 次搜索返回相同结果的关键词，直接跳过
+   - 运行第 2 天+: 对于连续 2 次搜索返回相同结果的关键词，直接跳过（日志中标注"跳过：与上次相同"）
    - 用时间过滤 `2026年5月` `2026年` 等减少重复；官网招生栏目需每次扫一次
    - 搜索大学+招生时务必加"本科"关键词，避免研究生招生结果淹没
    - 每条路径的官网至少扫一次
@@ -538,19 +589,34 @@ lark-cli im +messages-send --chat-id "${FEISHU_HOME_CHANNEL}" ...
    天气搜索继续，但降为第三优先级。
 
 3. **检查校测时间冲突**：每次运行都检查四条路径的校测日期是否有冲突。**⚠️ 注意：此前报告中认为"不冲突"的安排可能因高校官方通知而改变**（实例如同济初试6/3通知从上午改为下午，直接与港中深机考冲突）。交叉验证方法：搜索"X大学 2026 校测/初试 安排 通知"获取最新官方公告，与之前记录的时间对比。如有冲突，在日报的行动清单中突出标注
+   - **→ 记录到执行日志：✅ 决策: 校测冲突检查 → 结果（无冲突/发现X新冲突）**
 
 4. **按报告结构生成完整日报**
+   - **→ 记录到执行日志：📋 报告生成 → 日报正文完成**
 
 5. **检查反思清单**，在"信息管家提醒"中告知新发现
+   - **→ 记录到执行日志：✅ 决策: 信息管家提醒 → 无新发现/发现X条新内容**
 
 6. **将重要新发现追加到 `references/key-discoveries.md`**（见下方"关键发现日志更新"）
    - ⚠️ `read_file` 有 dedup 限制：同一文件内容未变时连续读取会被阻止。建议用 `patch` 工具追加新条目（匹配上一日最后一行作为 old_string），避免先 read_file 再用 Python 重写的脆弱路径。具体示例见"关键发现日志更新"→"追加方法：patch 工具优先"
+   - **→ 记录到执行日志：💾 key-discoveries.md 已更新**
 
 7. **将有价值的信息入库到 wiki/院校库/ 对应页面** — 搜索到的每一条有价值信息，分析属于哪个学校，创建或更新该校的 wiki/ 页面（见下方"院校页面更新"）
+   - **→ 记录到执行日志：💾 wiki院校库更新 → 更新了X个页面**
 
 8. **将日报归档到 GaokaoWIKI** 并同步 GitHub（见下方归档流程）
+   - **→ 记录到执行日志：💾 归档 GaokaoWIKI**
 
 9. **通过飞书推送给用户**（参考 `references/feishu-push.md`）
+   - **→ 记录到执行日志：📤 推送飞书群**
+
+10. **推送执行日志到飞书文档**：将临时文件中的日志内容用一次 `terminal()` 推送到飞书文档
+    ```bash
+    # 推送日志（在步骤 10 执行）
+    lark-cli docs +update --api-version v2 --doc "N8eNdusOvoyMmAxUcY0c6YRpnOb" --command append --as bot --content "$(cat /tmp/gaokao_exec_log_$(date +%Y%m%d).xml)"
+    ```
+    - 推送日志不设超时阈值——失败不阻塞主流程
+    - **→ 记录到执行日志（文件最后一行）：✅ 执行结束**
 
 ---
 
@@ -831,4 +897,5 @@ for s in ["同济大学", "南京大学", "香港中文大学（深圳）", "南
 | 南大综评报名系统 | https://bkzsks.nju.edu.cn |
 | 同济强基 | https://bm.chsi.com.cn/jcxkzs/sch/10247 |
 | GaokaoWIKI 仓库 | https://github.com/babyowen/GaokaoWIKI |
+| 执行日志文档 | references/execution-log-token.md（飞书文档 token 和推送命令） |
 | 各校2026招生简章汇总 | references/2026-admissions-brochures.md（本skill参考文件） |
