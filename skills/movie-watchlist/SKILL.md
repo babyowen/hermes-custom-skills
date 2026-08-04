@@ -1,7 +1,7 @@
 ---
 name: movie-watchlist
-description: 电影推荐与观影记录管理。每周从豆瓣Top250/年度榜单/新片榜搜索高分电影，记录到飞书多维表格中，标记下载状态和观看状态。
-version: 2.6.0
+description: 电影推荐与观影记录管理。每周从豆瓣Top250/年度榜单/新片榜搜索高分电影，记录到飞书多维表格中，标记下载状态和观看状态。触发词：电影推荐/推荐电影/豆瓣高分/看电影/片单/观影记录/电影清单/本周电影
+version: 2.6.1
 metadata:
   hermes:
     tags: [movie, feishu, bitable, weekly]
