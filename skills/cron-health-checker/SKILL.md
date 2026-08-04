@@ -112,6 +112,7 @@ cd ~/.hermes/cron/health_check && python3 health_checker.py
 2. 排除非每日任务的"缺失"误报（检查cron表达式中的星期字段）
 3. 核验 partial_failure 任务的成功/失败计数是否混入昨日数据
 4. "404"标记的任务需确认是否真错误还是URL误匹配
+5. 真 404 需区分「配置性问题」与「fallback 瞬时故障」（见下方 Fallback 404 验证小节）
 
 **报告格式**：
 
@@ -226,11 +227,171 @@ python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
    - 检查 `.env` 文件是否有行内注释污染
    - 检查 `KIMI_BASE_URL` 配置
    - 使用 `repr(os.getenv('KIMI_BASE_URL'))` 诊断
+   - ⚠️ 先区分「配置性 404」与「fallback 瞬时 404」（见下）：配置全对 + 直接 API 测试 200 = 瞬时故障，无需改配置，补跑即可
 
 4. **任务配置问题**
    - 检查cron表达式
    - 检查工作目录设置
    - 检查技能加载配置
+
+---
+
+## Report Correction Workflow (companion to Step 3)
+
+The health_checker.py's auto-generated report needs **manual verification and correction** before pushing to the user. The `health-check-correction-workflow` skill has been absorbed into this section. Reference files with concrete verification session examples are in `references/`:
+- `references/june-18-verification-examples.md` — Cross-day contamination detection, 404 vs Broken pipe
+- `references/june-19-verification-examples.md` — Systemic Broken pipe pattern, false 404 from skill text
+- `references/june-23-verification-examples.md` — Timestamp mismatch diagnostics, 4/5 "404" flags false
+- `references/june-26-verification-examples.md` — TimeoutError verification, full correction table
+
+### Verification Script (run for each partial_failure/missing task)
+
+```bash
+# 1️⃣ List today's files and check each for an ## Error section
+for f in ~/.hermes/cron/output/<job_id>/$(date +%Y-%m-%d)_*.md; do
+  [ -f "$f" ] || continue
+  echo -n "$(basename $f) → "
+  grep -q "## Error" "$f" && echo "⚠️ ERROR" || echo "✅ OK"
+done
+
+# 2️⃣ View the actual error content (tail end of file)
+tail -15 ~/.hermes/cron/output/<job_id>/<filename>.md
+
+# 3️⃣ Cross-day scan: find all files ever with errors
+for file in ~/.hermes/cron/output/<job_id>/*.md; do
+  if grep -q "## Error" "$file" 2>/dev/null; then
+    echo "ERROR: $(basename $file)"
+    awk '/## Error/{found=1} found' "$file" 2>/dev/null
+  fi
+done
+```
+
+### Timestamp Ownership Rule
+
+health_checker.py analyzes `today_files + yesterday_files` together. A reported error like `"07-09-43: RuntimeError"` could be from yesterday.
+
+**Check**: Match the timestamp to the filename:
+- `2026-06-18_07-09-43.md` → today's error ✅
+- `2026-06-17_07-09-43.md` → yesterday's error → do NOT count as today
+
+### 404 Error Verification
+
+The script uses `"404" in content` (global string match), which matches URLs, numbers, markdown table cells — not just errors.
+
+**How to verify**: Check the actual `## Error` paragraph at file tail:
+```bash
+tail -15 ~/.hermes/cron/output/<job_id>/<file>.md
+```
+
+**Real 404**: `## Error` section exists with `HTTP 404` text
+**False 404**: No `## Error` section, or `## Error` shows a different error type (e.g. Broken pipe)
+→ Reclassify as the actual error type shown in `## Error`
+
+### Fallback 404 验证（2026-08-02 实战新增）
+
+真 404 不一定=配置错误。当主 provider 先故障（stale stream/Broken pipe）触发
+fallback 切换时，fallback 的 404 可能是**瞬时故障**。验证三步：
+
+```bash
+# 1️⃣ 确认哪个 provider 真正失败（主 or 备）
+grep "API call failed after 3 retries" ~/.hermes/logs/agent.log | tail
+
+# 2️⃣ 看完整故障链（主 provider 先 stall → fallback 激活 → fallback 404？）
+grep -B5 -A5 "HTTP 404" ~/.hermes/logs/agent.log | tail -40
+
+# 3️⃣ 直接 API 测试 fallback model（Python 优先，勿用 curl 拼接密钥）
+cd ~/.hermes && python3 -c "
+import os, json, urllib.request, urllib.error
+from dotenv import load_dotenv
+load_dotenv('.env')
+key = os.getenv('KIMI_API_KEY','')
+for m in ['kimi-k2.7-code-highspeed','kimi-k2.5','kimi-for-coding']:
+    body = json.dumps({'model':m,'max_tokens':5,'messages':[{'role':'user','content':'hi'}]}).encode()
+    req = urllib.request.Request('https://api.kimi.com/coding/v1/messages', data=body, method='POST',
+          headers={'x-api-key':key,'Content-Type':'application/json','anthropic-version':'2023-06-01'})
+    try:
+        r = urllib.request.urlopen(req, timeout=20)
+        print(f'{m}: HTTP {r.status} OK')
+    except urllib.error.HTTPError as e:
+        print(f'{m}: HTTP {e.code} {e.read()[:200]}')
+    except Exception as e:
+        print(f'{m}: {type(e).__name__} {e}')
+"
+```
+
+**判定规则**：
+- 全部 model 200 → **瞬时故障**，无需改配置。报告标注「服务已恢复，建议补跑或等待明日自动运行」
+- 单个 model 404 但其他 200 → 配置问题（fallback 模型名不在 provider models 列表），修 fallback_providers
+- 全部 404 → URL/注释污染或密钥问题（查 .env 行内注释、KIMI_BASE_URL）
+
+⚠️ curl 用 `$(grep KIMI_API_KEY .env | cut -d= -f2)` 取密钥可能因特殊字符/换行
+被 shell 破坏而全部返回 HTTP:000（假阴性）→ 用 Python + load_dotenv 更可靠。
+
+### Recurrence Pattern Recognition
+
+Check if a Broken pipe/404 error is a one-off or an ongoing problem:
+```bash
+for file in ~/.hermes/cron/output/<job_id>/*.md; do
+  if grep -q "## Error" "$file" 2>/dev/null; then
+    echo "ERROR: $(basename $file)"
+  fi
+done
+```
+
+- **One date only** → new issue, flag for attention
+- **Scattered across dates** → persistent problem, needs active remediation
+- **Yesterday error, today clean** → auto-recovered, mark "昨日的X错误，今日已恢复"
+- **Today error with retry success** → mark "已通过重试恢复，需排查根因"
+- **间歇性（每1-2周一次，同任务）** → 瞬时故障模式，标注「瞬时双提供商故障」而非「配置问题」
+
+### Mapped Correction Table
+
+| Script status | Actual status | Badge | Example |
+|:---|:---|:---|:---|
+| missing | currently running | 🔄 | health check itself (schedule `30 23 * * *`) |
+| missing | weekly schedule | 📅 | movie recommendation (`0 10 * * 0`) |
+| missing | weekday-only | 📅 | a-stock report (`0 16 * * 1-5`) |
+| partial_failure | yesterday's error only | ✅ | WC2026 tasks (yesterday's failed file mixed in) |
+| partial_failure(404) | actually Broken pipe | ⚠️ | skill description text has "404" matches |
+| partial_failure | today has real error | ⚠️ | differentiate Broken pipe / 404 / TimeoutError |
+| partial_failure(TimeoutError) | yesterday's error, today clean | ✅ | WC2026赛后复盘 (yesterday idle > 600s) |
+| partial_failure(404) | fallback provider transient 404 (primary stalled first) | ⚠️→✅ | WC2026赛后复盘 (deepseek stale stream → kimi 404; direct test HTTP 200 hours later) |
+
+### Error Type Differentiation
+
+**TimeoutError** (Cron job idle timeout): The cron job's agent exceeded the idle timeout (default 600s). Common causes:
+1. **Long-running browser_navigate**: Browser hanging on slow page load (most common)
+2. **Waiting for stream response**: LLM provider stream stalls with no chunks
+3. **Complex processing**: Tool producing very large output
+4. **Network stall**: Connection drops mid-operation
+
+Diagnosis: Check the error message for the last activity:
+- `idle for 1579s — last activity: executing tool: browser_navigate` → Browser hung on page load
+- `idle for 1359s — last activity: waiting for stream response (192s, no chunks yet)` → Provider stall
+
+**Broken pipe** (RuntimeError: [Errno 32] Broken pipe): The agent's output pipe was closed before writing completed. Common in cron mode when output is large. Add "精简输出，分段输出，控制在2000字以内" to the task's prompt.
+
+When 3+ different tasks all show Broken pipe on the same day → systemic pipeline timeout, not individual task issues.
+
+**Real HTTP 404**: An API endpoint returned 404. Check `.env` line comment pollution or `KIMI_BASE_URL` config. ⚠️ 先做 Fallback 404 验证（见上）：配置全对 + 直接测试 200 = 瞬时故障。
+
+### Correction Markup (for corrected report)
+
+```
+✅ 任务名（脚本误将昨日的X错误计入今日）
+✅ 任务名（昨日22:11曾出现404，今日已恢复）
+✅ 任务名（fallback瞬时404：主模型流中断→备用模型瞬时404，数小时后直接测试全部恢复）
+📅 任务名（按周调度，下次 MM-DD）
+⚠️ 任务名 — 非"HTTP 404"（脚本全局匹配404字符串导致的误分类）
+⚠️ 任务名 — Broken pipe持续性问题（6/13、6/15、6/18均有发生）
+```
+
+### Cross-Task Pattern Detection
+
+When the same error type appears in **multiple unrelated tasks on the same day**:
+1. **3+ tasks with Broken pipe on same day** → systemic pipeline timeout. Report as systemic observation.
+2. **3+ tasks with HTTP 404 on same day** → API config issue or provider outage.
+3. **Multiple tasks missing on same day** → cron scheduler issue. Check Hermes service status.
 
 ---
 
@@ -252,6 +413,7 @@ python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
 - ❌ 不要使用模糊匹配检测暂停任务（`"[paused]" in cron_out`），必须逐行正则精确匹配 job_id 的状态
 - ❌ **不要悄悄替换正常运行任务的实现方案而不告知用户** — 如果任务依赖的脚本/API出了问题，用了替代方案（如 Python 脚本损坏后改用 curl 采集），必须在下一次报告中或通过即时消息告知用户"什么出了问题 + 替代方案是什么 + 对输出有何影响"。用户宁愿知道问题存在，也不愿被蒙在鼓里。
 - ❌ 健康检查自身的"今日未运行"是正常现象（当前正在执行，输出文件尚未生成），不要将其报告为故障
+- ❌ 不要把 fallback 瞬时 404 误当配置问题去改配置 — 直接 API 测试返回 200 就说明配置没问题
 
 ---
 
@@ -277,7 +439,7 @@ python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
 ### 2. 预期频率的动态估算
 
 **初始设计**: 硬编码每个任务的预期运行次数
-**问题**: 不同任务频率不同（每天1次、每2小时、每天3次），难以维护
+**问题**: 不同任务频率不同（每天1次、每2小时、每天3次等），难以维护
 **改进**: 根据最近7天历史记录自动计算平均每天运行次数
 **效果**: 自动适应任何频率的任务，无需配置
 
@@ -290,7 +452,7 @@ python3 ~/.hermes/skills/cron-health-checker/references/feishu-delivery.py \
 
 不同错误需要不同的修复策略：
 - 402错误 → 模型/余额问题
-- 404错误 → 配置问题
+- 404错误 → 配置问题（⚠️ 先排除 fallback 瞬时 404）
 - 无运行 → 调度/暂停问题
 
 ### 4. 区分"任务未运行"与"旧任务残留"
@@ -352,6 +514,7 @@ health_checker.py 自动生成的报告包含自动分析结果，但直接推�
 2. **非每日任务（周任务/工作日任务）**：脚本无cron表达式语义理解。每周日运行的任务（如电影推荐）在周一至周六显示为缺失；仅工作日运行的任务（如a股收盘日报，`0 16 * * 1-5`）在周末显示为缺失。处理：用 `hermes cron list --all` 获取实际调度表达式，标注实际周期
 3. **昨日失败计入今日**：脚本将昨日文件加入分析（`all_files = today_files + yesterday_files`），因此昨日失败会出现在"今日"的失败计数中。处理：检查失败文件的日期，区分昨日故障与今日故障
 4. **"404"误匹配**：脚本的 `"404" in content` 全局匹配可能将文件中的URL、页码等非错误内容归类为HTTP 404。处理：查看输出文件末尾的 `## Error` 段落确认真实错误
+5. **fallback 瞬时 404**：真 404 也可能是 fallback provider 瞬时故障（主 provider 先 stall → 切换 → fallback 恰好 404）。处理：grep agent.log 的 `API call failed after 3 retries` 看是哪个 provider，直接 API 测试确认 model 可用，标注「瞬时故障已恢复」而非配置问题
 
 **纠正流程**：
 ```
@@ -364,7 +527,8 @@ health_checker.py 自动生成的报告包含自动分析结果，但直接推�
    · `0 9,20 * * *` → 每日2次，需检查是否偏低
 4. 对健康检查任务自身（schedule `30 23 * * *`），标记为"正在执行"
 5. 对 partial_failure 任务，查看具体文件确认真实错误
-6. 组成修正后的报告写入新文件，再推送
+6. 对真 404：grep agent.log 区分主/备 provider，直接 API 测试判定瞬时 vs 配置
+7. 组成修正后的报告写入新文件，再推送
 ```
 
 ### 9. 脚本设计细节（Agent需要了解的）
@@ -381,3 +545,28 @@ health_checker.py 自动生成的报告包含自动分析结果，但直接推�
 3. 等待用户确认
 4. 执行修复
 5. 验证修复结果
+
+### 11. Fallback 瞬时 404（2026-08-02 实战）
+
+**场景**：WC2026赛后复盘（job 24587630598a）12:00 运行失败。agent.log 显示：
+主 provider deepseek-v4-flash 流中断（stale stream 180s → Broken pipe，3次重试
+失败）→ 自动切换 fallback kimi-k2.7-code-highspeed → 返回 HTTP 404
+resource_not_found_error（3次重试均失败）→ job 失败。
+
+**关键洞察**：**不是配置问题**。验证：① `hermes fallback list` 格式正确；
+② config.yaml 中 kimi-k2.7-code-highspeed 同时存在于 fallback_providers 和
+kimi-coding models 列表；③ .env 无行内注释污染；④ **数小时后直接 API 测试三个
+kimi model 全部 HTTP 200** → 判定为双提供商瞬时故障（deepseek 假连 + kimi
+恰好同时段 404）。
+
+**历史模式**：该任务间歇性失败（6/14 Broken pipe、6/21 404、6/25 超时、8/2
+404），约每1-2周一次，均为瞬时故障 → 报告标注「瞬时故障已恢复，建议补跑或等待
+明日自动运行」，**不要**修改配置。
+
+**curl 陷阱**：`curl -H "x-api-key: $(grep KIMI_API_KEY .env | cut -d= -f2)"`
+可能因密钥含特殊字符/换行被 shell 破坏而全部返回 HTTP:000（假阴性）→ 用
+Python + load_dotenv 测试更可靠（见上方 Fallback 404 验证脚本）。
+
+**附带观察（非 cron）**：gateway 日志持续报 `~/.hermes/kanban.db` 不是有效
+SQLite 数据库 → 看板调度暂停。可 `hermes kanban init` 恢复（与 cron 故障无关，
+但值得在报告中附带告知用户）。

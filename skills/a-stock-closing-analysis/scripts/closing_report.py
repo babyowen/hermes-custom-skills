@@ -118,7 +118,9 @@ def run_mx(script, query):
 def run_batch(script, queries):
     r = {}
     for q in queries:
-        r[q] = run_mx(script, q)
+        v = run_mx(script, q)
+        if v is not None:
+            r[q] = v
         time.sleep(1.2)
     return r
 
