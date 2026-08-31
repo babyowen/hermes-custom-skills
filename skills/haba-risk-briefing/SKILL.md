@@ -2,7 +2,7 @@
 name: haba-risk-briefing
 display_name: 虎跳峡·哈巴雪山每日风险简报
 description: 每日07:30（北京时间）生成虎跳峡镇/三坝乡/哈巴村/哈巴雪山及高海拔区域最新天气与灾害风险简报——官方预警（暴雨/雷电/大风/冰雹/山洪/滑坡/泥石流/地灾）、24-72h降雨趋势、高海拔上游对比、两条徒步线路绿黄橙红风险评级。触发词：虎跳峡天气、哈巴雪山风险、今日简报。
-version: 1.0.0
+version: 1.1.0
 ---
 
 # 虎跳峡·哈巴雪山每日风险简报
@@ -22,14 +22,14 @@ version: 1.0.0
 
 ## 执行流程
 
-**Step 1 读取注入数据**：cron 触发时已自动运行 `scripts/fetch_haba_weather.py`，其 JSON 注入本会话。解析要点：
-- `past24h_sum_mm` / `past72h_sum_mm`：各点位过去24h/72h累计雨量 → 找出明显偏大区域（点位间横向对比）
-- `days[].sum_mm / max_hourly_mm / hours_ge10mm`：逐日雨量与逐时峰值
-- `short_intense_windows`：未来72h短时强降水信号（≥10mm/h）
-- `next24/48/72h_sum_mm`：未来雨量趋势
-- 若 stdout 为空或含 `fetch_errors`：用 web_extract 直调 Open-Meteo URL 模板补数（见 references/sources.md）；仍失败则在简报注明"降水数据源暂不可用"，改用中国天气网/nmc 预报页定性。
+**Step 1 读取注入数据（两条腿，必须交叉验证）**：cron 触发时已自动运行合并脚本，注入 JSON 结构 `{"open_meteo": {...}, "domestic_cma": {...}}`：
+- `open_meteo`（国外网格，**趋势参考、非实测**）：各点位 `past24h/72h_sum_mm`、`days[].sum_mm/max_hourly_mm`、`short_intense_windows`（≥10mm/h）、`next24/48/72h_sum_mm`
+- `domestic_cma`（**国内官方，权威优先**）：`stations[香格里拉/丽江].wc_obs.rain24h_mm`（站点实测24h雨量）、`now`（国家站实况）、`daily`（官方逐日预报）、`warnings`（**官方预警 JSON 含全文**，来源：国家预警信息发布中心）
+- **交叉验证铁律**：网格与站点实测不一致时（典型：局地强对流，网格24h=26.5mm 而市区站点=0mm），**以官方实测+预警为准**，并在简报说明差异成因（强降水局地性强，站点/网格都可能"落空"）；官方 `warnings` 直接进简报置顶区
+- 若某腿含 `fetch_errors`/缺失：用 web_extract 直调对应 API 补数（模板见 references/sources.md）；两腿都挂才写"降水数据源暂不可用"，改用中国天气网预报页定性
 
 **Step 2 官方预警与突发消息扫描**（每条记录：级别/类型/发布时间/发布单位/影响区域）：
+0. **首选已注入的 `domestic_cma.warnings`**（国家预警信息发布中心原文 JSON，含全文），直接采用并置顶；同时 web_search 补查山洪/地灾省级预警与突发消息
 1. web_search 组合检索（关键词模板见 references/sources.md），结果**点开官方原文读全文**，禁止只看摘要
 2. 优先级：中央气象台(nmc.cn)/中国天气网预警列表 → 云南省气象台 → 迪庆州气象台 → 香格里拉市气象局 → 水利部+中国气象局**山洪灾害气象预警** → 自然资源部+中国气象局**地质灾害气象风险预警** → 应急管理/交通部门 → 文旅/景区公告（虎跳峡景区、哈巴雪山登山管制、香格里拉文旅）
 3. 页面打不开：scrapling stealthy-fetch 降级（见 scrapling skill）
@@ -77,6 +77,7 @@ version: 1.0.0
 ## 注意事项
 
 - 时间一律**北京时间**（禁止写 CST）；数据注明获取时间
+- **双源原则**：网格(Open-Meteo)只做山区点位趋势/对比（山区无国家站），数值以国内官方站点实测+预警为准；两源矛盾时在简报中如实说明
 - Open-Meteo 为网格预报/再分析，非站点实测；与官方实况冲突时以官方为准并标注
 - 预警发布时间超过24h要注明"已过期/注意时效"；级别以发布单位最新文件为准
 - 简报版面紧凑：飞书不渲染表格，用「｜」一行式排版，拒绝长段落
