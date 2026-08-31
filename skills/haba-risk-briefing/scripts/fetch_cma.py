@@ -19,6 +19,14 @@ STATIONS = [
     ("lijiang", "丽江", "56651", "101291401"),          # 毗邻玉龙县，虎跳峡东岸
 ]
 
+# 仅用于预警抓取的州/县码（覆盖德钦/维西等县预警；无独立国家站）。已实测核实(2026-08-31)：
+# 迪庆=101291305 德钦=101291302 维西=101291303（101291306无效, 101291304=中甸旧码）
+EXTRA_WARN_CODES = [
+    ("diqing", "迪庆州", "101291305"),
+    ("deqin", "德钦县", "101291302"),
+    ("weixi", "维西县", "101291303"),
+]
+
 CMA_NOW = "https://weather.cma.cn/api/now/{sid}"
 CMA_WEATHER = "https://weather.cma.cn/api/weather/{sid}"
 WC_SK2D = "https://d1.weather.com.cn/sk_2d/{wcode}.html"
@@ -167,6 +175,19 @@ def main():
             failed += 1
         out["stations"][key] = st
         fetch_warnings(wcode, out["warnings"])
+    for _k, _name, wcode in EXTRA_WARN_CODES:
+        fetch_warnings(wcode, out["warnings"])
+    # 去重（同一时间+类型+级别只留一条）
+    seen, dedup = set(), []
+    for w in out["warnings"]:
+        if "parse_error" in w:
+            dedup.append(w)
+            continue
+        key = (w.get("publish_time_bjt"), w.get("type"), w.get("level"), w.get("region", "")[:6])
+        if key not in seen:
+            seen.add(key)
+            dedup.append(w)
+    out["warnings"] = dedup
     print(json.dumps(out, ensure_ascii=False, indent=1))
     if failed == len(STATIONS):
         sys.exit(1)
