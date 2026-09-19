@@ -1,0 +1,37 @@
+{
+  "_comment": "serp-news-monitor 运行参数。改这里即可调整巡检口径，不要改脚本。",
+  "db": {
+    "name": "serp_news",
+    "table": "scored_news",
+    "forbidden_tables": ["scored_news_test"],
+    "connect_timeout": 10,
+    "read_timeout": 30
+  },
+  "themes": ["养老", "公积金", "数字政务", "政府基金", "中国烟草", "零基预算", "烟草服务银行", "机关事务"],
+  "baseline": {
+    "days": 7,
+    "min_valid_days": 3,
+    "deviation_pct": 40,
+    "min_abs_diff": 10
+  },
+  "sample": {
+    "n": 8,
+    "min_long_with_summary": 4,
+    "long_content_chars": 500,
+    "low_score_max": 2,
+    "low_score_threshold": 1,
+    "content_excerpt_chars": 2500
+  },
+  "high_score_threshold": 4,
+  "summary_score_threshold": 3,
+  "official_sourceapi": "官网抓取",
+  "official_lookback_days": 14,
+  "official_lists": [
+    "http://www.tobacco.gov.cn/gjyc/hyyw/list.shtml",
+    "http://www.tobacco.gov.cn/gjyc/gdxw/list.shtml",
+    "http://www.tobacco.gov.cn/gjyc/jcgz/list.shtml",
+    "http://www.tobacco.gov.cn/gjyc/ychyszhzx/list.shtml",
+    "http://www.tobacco.gov.cn/gjyc/zmgl/list.shtml"
+  ],
+  "state_dir": "~/.hermes/cache/serp-news-monitor"
+}
