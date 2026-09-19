@@ -61,7 +61,9 @@ lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
 - 正常项一行带过；异常项写「什么＋多少＋建议动作＋记录 ID」，并给依据（如同星期对比），不做因果猜测。
 - 完整图标字典、模板与实例：`references/report-template.md`。
 
-⑦ **落状态**（同日重复执行去重、留抽样 ID 与回执）：`state --date <D> --merge '{"sent":true,"msg_id":"om_xxx","sample_ids":[...],"extended_ids":[...]}'`，读回用 `state --date <D>`。文件在 `~/.hermes/cache/serp-news-monitor/<D>.json`。重复检查有新发现时简报标 🔁 更新。绝不存密码、绝不改生产数据。
+⑦ **落状态**（同日重复执行去重、留抽样 ID 与回执）：`state --date <D> --merge '{"sent":true,"msg_id":"om_xxx","sample_ids":[...],"extended_ids":[...]}'`，读回用 `state --date <D>`。文件在 `~/.hermes/cache/serp-news-monitor/<D>.json`。
+- `msg_id` **只保留最新一次真正发出的回执**；旧回执放进 `msg_id_history` 数组。复跑报回执时以 `state` 读到的 `msg_id` 为准，**不要**引用历史 ID（2026-09-19 复跑时就误报了上一版回执）。
+- 重复检查有新发现时简报标 🔁 更新；绝不在状态文件里存密码；绝不改生产数据。
 
 ## 结论四档
 | 档位 | 判据 |

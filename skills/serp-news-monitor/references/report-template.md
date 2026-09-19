@@ -56,6 +56,7 @@ lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
 {"sent": true, "msg_id": "om_xxx", "verdict": "关注",
  "sample_ids": [143523, 143627], "extended_ids": [143636], "updated_at": "…"}
 ```
+`msg_id` 只存最新一次发出的回执（旧回执放 `msg_id_history`），复跑时照它报回执，别引用历史 ID。
 
 ## 实例（2026-09-18 实跑）
 ```text
