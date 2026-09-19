@@ -1,7 +1,7 @@
 ---
 name: serp-news-monitor
 description: "serp_news 新闻采集日巡检：库内统计/样本质检/官网有无核查＋飞书简报。触发词：serp巡检/serp_news检查/新闻采集巡检/serp日报"
-version: 1.1.0
+version: 1.1.1
 metadata:
   hermes:
     tags: [serp_news, monitor, mysql, daily-briefing, feishu]
