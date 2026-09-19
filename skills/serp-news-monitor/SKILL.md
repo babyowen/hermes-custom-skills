@@ -56,9 +56,17 @@ metadata:
 
 ⑥ **发飞书简报**（正常也发；连接失败发「监测受阻」）
 ```bash
-lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --markdown "【serp_news 日巡检｜业务日期 D】…"
+lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
+  --markdown "$(cat /tmp/serp_report_<D>.md)" --idempotency-key "serp-news-check-<D>"
 ```
-用 `--as bot`、发到用户本人收件目标，不重配渠道。核对返回的消息 ID 才算「已通知」；发送状态不明时不要盲目重发。报告 200–400 字，格式见 `references/report-template.md`。
+用 `--as bot`、发到用户本人收件目标，不重配渠道。核对返回 `ok:true` ＋ `message_id` 才算「已通知」；状态不明不盲目重发（同 key 防重）。
+
+**版式：图标化＋扫读优先（硬要求）**，200–400 字、≤15 行，结论和待办在前 3 行：
+- 首行 `【serp_news 日巡检｜业务日期 YYYY-MM-DD】` ＋ 状态图标：🟢正常 / 🟡关注 / 🔴异常 / ⛔受阻。
+- 固定 6 行标签：📊数据 ｜ 🏷️主题 ｜ 🤖模型 ｜ 🔍抽检 ｜ 🌐官网 ｜ 📌需处理（无则整行省略）＋ 🧭边界。
+- 图标只表状态不装饰：✅通过 ⚠️待核 ❌已确认问题 ❔不可判断 📈/📉/➖ 高/低于/持平基线 🔁同日更新。
+- 正常项一行带过；异常项必须写「什么＋多少＋建议动作＋记录 ID」，并给依据（如同星期对比），不用因果猜测。
+- 完整图标字典、模板与实例见 `references/report-template.md`。
 
 ⑦ **落状态**（同日重复执行去重、留抽样 ID 与回执）
 ```bash
