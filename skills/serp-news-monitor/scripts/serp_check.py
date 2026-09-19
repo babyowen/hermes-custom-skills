@@ -436,12 +436,14 @@ def cmd_official(cur, cfg, a):
     out = {"ok": True, "date": D.isoformat(), "lookback_days": look,
            "count_by_date": [{"date": r["d"], "n": r["n"]} for r in per_day],
            "today_count": len(today),
+           "has_records": len(today) > 0,
+           "verdict_line": ("官网：有，当日 %d 条" % len(today)) if today else "官网：当日无抓取记录",
            "last_date_with_records": last[0]["d"] if last and last[0]["d"] else None,
            "days_since_last": zero_days,
            "today_records": today,
-           "boundary": "共享库中的官网记录只能证明有产出，不能证明上海任务完整成功；执行日志未验证"}
-    lines = ["官网抓取：当日 %d 条；最近一次产出 %s；回看 %d 天分布 %s"
-             % (len(today), out["last_date_with_records"], look,
+           "boundary": "只看库内官网抓取记录的有/无，不访问官网页面、不推断漏采；执行日志未验证（上海任务）"}
+    lines = ["官网：%s ｜ 最近一次产出 %s ｜ 回看 %d 天分布 %s"
+             % ("有" if today else "当日无抓取记录", out["last_date_with_records"], look,
                 ", ".join("%s:%d" % (r["d"], r["n"]) for r in per_day) or "无")]
     for r in today:
         lines.append("  id=%s score=%s len=%s %s" % (r["id"], r["score"], r["clen"], (r["title"] or "")[:60]))

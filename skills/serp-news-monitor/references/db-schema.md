@@ -33,6 +33,13 @@
 - 各来源占比量级：serp_googlenews > serp_bingnews > serp_baidunews > serp_duckduckgo_news ≫ 官网抓取。
 - 官网抓取量级很低（每天 0–4 条），多天无记录属常见 → 不要按天告警。
 
+## 官网抓取（sourceapi='官网抓取'）实测反查（2026-09-19）
+- 总量 242 条，跨 2025-11-10 → 2026-09-18，129 个有产出的业务日期；`keyword` 全部为「中国烟草」，`score` 全部 4 分，正文均值 825 字，242 条中 28 条无摘要（正常，可能不过摘要阶段）。
+- 链接格式 `http://www.tobacco.gov.cn/gjyc/<栏目>/<YYYYMM>/<hash>.shtml`；按栏目分布：`hyyw`(行业要闻) 126、`jcgz`(基层工作) 46、`gdxw`(各地新闻) 45、`ychyszhzx`(数字化专项) 20、`zmdt` 4；另有 1 条非本站链接（id=70765 为 cnfin.com 转载，格式异常）。
+- 即库内实际覆盖 4 个栏目（hyyw/gdxw/jcgz/ychyszhzx）＋零星 zmdt；**`zmgl` 在 242 条里 0 条** → 旧版 skill 的第 5 个 URL（zmgl）无产出证据，2026-09-19 已从 config 移除（`official_lists` 置空）。
+- 量级：每日 0–4 条、多天为 0，属常态，不告警。
+- **本机访问不了官网**：`web_extract` 报 "Blocked: URL targets a private or internal network address"，`~/scrapling_test.py` 早前记录 DNS 不可达，终端 curl 需人工审批 → 官网只按库内记录判有无（用户 2026-09-19 确认）。
+
 ## 常见坑
 - `fetchdate` 是 date 类型，比较用 `%s` 传 `datetime.date`，不要传字符串拼接。
 - MySQL 里 `sourceapi<>'官网抓取'` 会把 NULL 行滤掉 → 必须写 `(sourceapi IS NULL OR sourceapi<>'官网抓取')`。

@@ -26,12 +26,7 @@
   "summary_score_threshold": 3,
   "official_sourceapi": "官网抓取",
   "official_lookback_days": 14,
-  "official_lists": [
-    "http://www.tobacco.gov.cn/gjyc/hyyw/list.shtml",
-    "http://www.tobacco.gov.cn/gjyc/gdxw/list.shtml",
-    "http://www.tobacco.gov.cn/gjyc/jcgz/list.shtml",
-    "http://www.tobacco.gov.cn/gjyc/ychyszhzx/list.shtml",
-    "http://www.tobacco.gov.cn/gjyc/zmgl/list.shtml"
-  ],
+  "_official_mode": "db_only：只查库内官网抓取记录的『有/无 + 最近产出日期』，不访问官网页面（官网反爬且本机不可达，用户 2026-09-19 明确只看库内有无）。如需恢复网页核对，再加 official_lists。",
+  "official_lists": [],
   "state_dir": "~/.hermes/cache/serp-news-monitor"
 }
