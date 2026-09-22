@@ -50,7 +50,10 @@
 （未取到数据，本次不报清单变化）
 ```
 
-## 推送命令（cron 环境变量可能未导出，先从 ~/.hermes/.env 取）
+## 推送命令（**可选**）
+默认路径是**系统投递**（把报告正文作为最终回复发出，cron 的 `deliver` 负责投递）——单条消息、不依赖 terminal，是当前 cron job 的配置。
+只有需要幂等防重（会被手动补跑）或原生 post 排版时，才改用下面这条；此时最终回复只写一句确认语，**不要**再同时回复全文。
+cron 环境变量可能未导出，先从 `~/.hermes/.env` 取：
 ```bash
 export FEISHU_HOME_CHANNEL=$(grep '^FEISHU_HOME_CHANNEL=' ~/.hermes/.env | cut -d= -f2-)
 lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
