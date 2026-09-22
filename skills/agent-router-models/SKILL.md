@@ -30,8 +30,9 @@ metadata:
 ② 读注入 JSON 的 `verdict` 决定报告口径（见下方判断表）；`_run_failed: true` 走「监测受阻」口径。
 ③ **交叉核对在用模型**（决策关键）：读 `~/.hermes/config.yaml` 的 `model` 与 `fallback_providers`，把模型名与清单里的 id 精确比对。
    - 都在架 → 一行 ✅ 带过；有下线项 → 🔴 置顶，写明「哪个、配置里在哪、建议换哪个在架模型」，只给建议不改配置。
-④ 按 `references/report-template.md` 输出（图标化、≤15 行、结论前置），用 `lark-cli --markdown` 推送（模板文件里给了确切命令）。
-⑤ 最终回复写一句确认语即可（完整报告已由 lark-cli 发出）。
+④ 按 `references/report-template.md` 输出（图标化、≤15 行、结论前置）。
+   - **cron 场景**（无人对话）：写文件后用 `lark-cli --markdown` 推送（命令见模板文件），最终回复只写一句确认语。
+   - **用户当面问的场景**（例如用户就在飞书私聊里让你查）：把报告正文**直接作为回复发出**，不要再发第二条 lark-cli 消息（会重复刷屏）。
 
 ### 模式 B：手动全量查询（用户问"网关现在有哪些模型"）
 `python3 ~/.hermes/skills/agent-router-models/scripts/check_models.py --list`
