@@ -71,7 +71,7 @@ python3 ~/.hermes/skills/agent-router-models/scripts/selftest.py
 ```yaml
 script: agent_router_models.py        # ~/.hermes/scripts/ 下，实体薄包装（cron 拒绝绝对路径/symlink）
 skills: [agent-router-models]
-schedule: "30 22 * * *"               # 每日 22:30（北京时间）
+schedule: "0 14 * * *"                # 每日 14:00（北京时间）—— 当前生效配置
 deliver: "origin"
 ```
 薄包装内容：转调 `~/.hermes/skills/agent-router-models/scripts/check_models.py`，透传 argv 与退出码。技能更新脚本时包装器无需改动。
