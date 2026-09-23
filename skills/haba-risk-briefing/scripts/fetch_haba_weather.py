@@ -29,7 +29,12 @@ POINTS = [
     ("heihai",        "黑海营地·垭口(最高关注点)", 27.350, 100.115, "约4100-4200m 上游湖泊(尖山牧场同区,不登顶)", 4150),
     ("xianggelila",   "香格里拉市区(参考)",  27.830,  99.700, "约3280m 迪庆州府", 3280),
     ("lijiang",       "丽江市区(参考)",      26.860, 100.230, "约2400m 毗邻玉龙县", 2400),
+    # v1.3：三坝乡（哈巴村所在乡，乡政府·白地村）——只作「哈巴村实况锚点」的网格对照点，不进简报温度行
+    ("sanba",         "三坝乡·白地村(锚点对照)", 27.330, 100.030, "约2380m 哈巴村所在乡", 2380),
 ]
+
+# 简报温度行只报这 4 个路线点位（其余点为锚点/校验用）
+ROUTE_POINTS = ["tlg_town", "haba_village", "lanhuaping", "heihai"]
 
 PAST_DAYS = 3
 FUTURE_DAYS = 4
@@ -204,6 +209,17 @@ def build_temp_est(data, hourly_t, temp, days, anchor_idx, elev_actual_m, now):
     night = [temp[i] + corr for i in win72 if int(hourly_t[i][11:13]) in NIGHT_HOURS]
     night_min3d = round(min(night), 1) if night else None
 
+    # v1.3：今日逐时校正后温度（供 wrapper 做「实况锚定偏差校正」取同一时刻的值）
+    hourly_today = []
+    for i in idx_today:
+        if ok(i):
+            hourly_today.append({"time_bjt": hourly_t[i][11:16], "est_c": est(i)})
+
+    # v1.3：过去24h（与乡镇自动站实测同一窗口）的校正后高低温，供 wrapper 量模式偏差
+    past = [est(i) for i in range(max(0, anchor_idx - 24), anchor_idx + 1) if ok(i)]
+    past24h = {"tmin_c": round(min(past), 1), "tmax_c": round(max(past), 1),
+               "n_hours": len(past)} if past else {"tmin_c": None, "tmax_c": None, "n_hours": 0}
+
     return {
         "available": True,
         "note": ("网格温度按 %s℃/1000m 直减率校正到实际海拔后的**估算值**（山区无国家站，仅供装备/体感参考）；"
@@ -221,6 +237,8 @@ def build_temp_est(data, hourly_t, temp, days, anchor_idx, elev_actual_m, now):
             "afternoon_14_16": win(14, 16),
             "night_20_23": win(20, 23),
         },
+        "hourly_today": hourly_today,
+        "past24h": past24h,
         "days": fut,
         "next72h_hours_below_0c": below0,
         "next72h_hours_below_5c": below5,
