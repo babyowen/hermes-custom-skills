@@ -104,16 +104,22 @@ def _psearch(p):
 # ==================== 运行mx ====================
 
 def run_mx(script, query):
-    try:
-        subprocess.run([VENV_PYTHON, script, query], capture_output=True, text=True, timeout=TIMEOUT,
-                       env={**os.environ, "MX_APIKEY": os.environ["MX_APIKEY"]})
-        jp = _find_json(OUTPUT_DIRS[script], query)
-        if jp:
+    for attempt in range(2):  # 失败重试1次（避免瞬时超时直接回退DDG）
+        try:
+            subprocess.run([VENV_PYTHON, script, query], capture_output=True, text=True, timeout=TIMEOUT,
+                           env={**os.environ, "MX_APIKEY": os.environ["MX_APIKEY"]})
+            break
+        except Exception:
+            time.sleep(1.2)
+    jp = _find_json(OUTPUT_DIRS[script], query)
+    if jp:
+        try:
             if script == MX_XUANGU: return _pxuangu(jp)
             if script == MX_DATA: return _pdata(jp)
             if script == MX_SEARCH: return _psearch(jp)
-        return None
-    except: return None
+        except Exception:
+            return None
+    return None
 
 def run_batch(script, queries):
     r = {}
@@ -238,6 +244,20 @@ def _chg(item):
 def _name(item): return item.get('SECURITY_SHORT_NAME',item.get('entityName','?'))
 def _code(item): return item.get('SECURITY_CODE','')
 
+# ==================== 垃圾标题过滤 ====================
+_GARBAGE_PATTERNS = ["百度百科", "wikipedia", "youtube", "bing", "quora",
+                     "letter a", "type a", "letter a ", "alphabet", "字母", "发音"]
+def _clean_title(t):
+    """清理标题中的采集残留（如 ' - 今日头条Loading.'）"""
+    t = re.sub(r'\s*[-|]\s*(今日头条Loading|Loading|今日头条)\s*\.?$', '', t).strip()
+    return t
+def _is_garbage_title(t):
+    """过滤明显无关的条目（DDG 回退常返回字母'А'类垃圾结果）"""
+    tl = t.lower()
+    if any(g in tl for g in _GARBAGE_PATTERNS): return True
+    if len(t) < 5: return True
+    return False
+
 # ==================== 报告生成 ====================
 
 def generate(indices, stats, extremes, news_data, special_data):
@@ -256,9 +276,10 @@ def generate(indices, stats, extremes, news_data, special_data):
     for q, rs in indices.items():
         if not rs: continue
         r = rs[0] if isinstance(rs,list) else rs
-        name = q.split('今日')[0][:4]
+        name = q.split('今日')[0][:5]
         pr = r.get('最新价',r.get('收盘价','?'))
-        cg = r.get('涨跌幅',r.get('f3','?'))
+        # mx-data 实际返回字段名为「最新涨跌幅」（2026-09-16 实测），需兼容
+        cg = r.get('涨跌幅',r.get('最新涨跌幅',r.get('f3','?')))
         amt = r.get('成交额','')
         # 涨跌方向
         try:
@@ -383,10 +404,8 @@ def generate(indices, stats, extremes, news_data, special_data):
         L.append("🔥 今日特别关注")
         seen = set(); cnt = 0
         for x in special:
-            t = x.get('title','')
-            if t and t not in seen and cnt < 4:
-                # 跳过太短的标题（更像是关键词而非新闻）
-                if len(t) < 5: continue
+            t = _clean_title(x.get('title',''))
+            if t and t not in seen and cnt < 4 and not _is_garbage_title(t):
                 seen.add(t)
                 src = x.get('source','')
                 L.append(f"📰 {t}" + (f"（{src}）" if src else ""))
@@ -399,8 +418,8 @@ def generate(indices, stats, extremes, news_data, special_data):
         L.append("📢 其他要闻")
         seen = set(); cnt = 0
         for x in news:
-            t = x.get('title','')
-            if t and t not in seen and cnt < 4:
+            t = _clean_title(x.get('title',''))
+            if t and t not in seen and cnt < 4 and not _is_garbage_title(t):
                 seen.add(t)
                 src = x.get('source','')
                 L.append(f"📰 {t}" + (f"（{src}）" if src else ""))

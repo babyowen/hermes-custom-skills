@@ -1,7 +1,7 @@
 ---
 name: serp-news-monitor
 description: "serp_news 新闻采集日巡检：库内统计/样本质检/官网有无核查＋飞书简报。触发词：serp巡检/serp_news检查/新闻采集巡检/serp日报"
-version: 1.1.1
+version: 1.1.2
 metadata:
   hermes:
     tags: [serp_news, monitor, mysql, daily-briefing, feishu]
@@ -26,7 +26,7 @@ metadata:
 脚本：`~/.serp-monitor-venv/bin/python ~/.hermes/skills/serp-news-monitor/scripts/serp_check.py`
 （该 venv 只为 pymysql 而建；Hermes 自带 python 没装 pymysql，别换解释器）
 
-① **聚合统计**（一次查询覆盖 D 与之前 7 天）：`stats --date <D> --json`（D 默认北京时间昨天）
+① **聚合统计**（一次查询覆盖 D 与之前 7 天）：`--json stats --date <D>`（D 默认北京时间昨天；`--json` 是**全局参数，必须写在子命令前**，否则报 `unrecognized arguments: --json`）
 看 `compare_total/compare_high/theme_breakdown/flags`。退出码：0 正常、2 有风险提示、1 执行失败。
 
 ② **数量判断**：以 `baseline_total_avg` 为基线（有效天数看 `baseline_valid_days`）。偏离 >40% 且绝对差 ≥10 条才算线索。`baseline_zero_record_days` 是零记录日期（≠未知缺失，别当正常零产出，也别无声剔除）。有效样本 <3 天写「基线不足」；基线为 0 不计算百分比。
@@ -35,24 +35,26 @@ metadata:
 
 ④ **随机抽检模型输出**（默认 8 条普通来源，按业务日期设种子、同日可复现）
 ```bash
-…/serp_check.py sample --date <D> --json          # 只出元数据：id/主题/分数/正文长度/是否有摘要
-…/serp_check.py contents --ids <逗号分隔> --json   # 一次批量取正文与摘要（默认每条截断 2500 字）
+…/serp_check.py --json sample --date <D>          # 只出元数据：id/主题/分数/正文长度/是否有摘要
+…/serp_check.py --json contents --ids <逗号分隔>   # 一次批量取正文与摘要（默认每条截断 2500 字；输出量大，重定向到文件再读）
 ```
 - 评分检查：主题/正文与分数是否明显矛盾，无正文/错误页/广告模板是否被给高分。有完整评分规则才按规则判，没有就只指出明显疑点，不按个人偏好重新打分。
 - 摘要检查：主体、事件、时间、金额、关键数字是否与正文一致；是否编造、混入别的新闻、输出报错或废话。短正文直接当摘要＝正常。公积金样本顺带看地域是否与原文冲突。
 - `constraints` 里核对「≥4 条有摘要且正文 >500 字」是否满足。有问题最多再定向看 4 条，证据不足就写「建议人工复核」。措辞用「本次抽样未发现明显问题」，**不要**写「所有模型输出正确」。
 
-⑤ **官网采集（只看库，不访问官网）**：`official --date <D> --json`
+⑤ **官网采集（只看库，不访问官网）**：`--json official --date <D>`
 - 判据只有两条：**当日有没有** `sourceapi='官网抓取'` 记录（有→「有，N 条」／无→「当日无官网抓取记录」），以及**最近一次产出是哪天**。有就有、没有就没有，一句话说清即可。
 - **不去访问官网页面**、不做「疑似漏采」推断、不推断上海任务是否成功（官网对本机反爬／不可达，且用户 2026-09-19 明确只看库内有无）。
 - 官网来源固定 4 分、可能不过摘要阶段 → 不纳入模型抽检与默认摘要缺失率；量少（0–4 条/天）属常态。
 
 ⑥ **发飞书简报**（正常也发；连接失败发「监测受阻」）
 ```bash
+export FEISHU_HOME_CHANNEL=$(grep '^FEISHU_HOME_CHANNEL=' ~/.hermes/.env | cut -d= -f2-)
 lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
   --markdown "$(cat /tmp/serp_report_<D>.md)" --idempotency-key "serp-news-check-<D>"
 ```
 用 `--as bot`、发到用户本人收件目标，不重配渠道。核对返回 `ok:true` ＋ `message_id` 才算「已通知」；状态不明不盲目重发（同 key 防重）。
+cron 环境里 `$FEISHU_HOME_CHANNEL` 可能未导出（2026-09-21 实测为空），先从 `~/.hermes/.env` 提取再用。简报超 400 字时用 `lark-cli im +messages-edit --as bot --message-id <om_> --markdown …` **原地压缩**（模板要求行数多，10 行全文约 450–530 字属正常），不要发第二条。
 
 **版式：图标化＋扫读优先（硬要求）**，200–400 字、≤15 行，结论与待办在前 3 行：
 - 首行 `【serp_news 日巡检｜业务日期 YYYY-MM-DD】` ＋ 状态图标：🟢正常 / 🟡关注 / 🔴异常 / ⛔受阻。
@@ -94,6 +96,9 @@ lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
 | 从一条记录推断写入机器 | 库多机共享：新加坡主流水线＋上海官网任务 |
 | 公积金 region 为空判错 | 地域无法可靠判断时可空，不算错 |
 | 主题/阈值写死在脚本 | 改 `scripts/config.json` |
+| 子命令报 `unrecognized arguments: --json` | `--json` 为全局参数，写子命令前：`--json stats --date D` |
+| cron 里 `$FEISHU_HOME_CHANNEL` 为空 | `export $(grep '^FEISHU_HOME_CHANNEL=' ~/.hermes/.env)` 后再发 |
+| 简报超长／版式要改 | 同一条消息 `im +messages-edit` 原地改，别重发（同 key 去重、新 key 会刷屏） |
 
 - 详细口径与边界：`references/check-rules.md` ｜ 字段与库结构：`references/db-schema.md`
 - 简报模板与实例：`references/report-template.md` ｜ 运行参数：`scripts/config.json`
