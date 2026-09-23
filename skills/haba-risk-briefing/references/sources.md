@@ -5,7 +5,7 @@
 - **国内官方腿**（权威优先，`scripts/fetch_cma.py`）：中国气象局国家站实况/官方预报 + 中国天气网站点24h雨量 + **官方预警 JSON（国家预警信息发布中心原文）**
 - **乡镇实况腿**（**温度打底/锚定**，`scripts/fetch_town_obs.py`）：中国天气网乡镇预报页内嵌的**乡镇自动站逐时实测**（虎跳峡镇/三坝乡/建塘镇/金江镇）+ 该镇官方乡镇预报高低温
 - **国外网格腿**（趋势参考，`scripts/fetch_haba_weather.py`）：Open-Meteo 7 个山地点位逐时降水/气温/阵风
-- 合并脚本：`~/.hermes/scripts/fetch_haba_weather.py`（cron 的 script 字段），注入 `{"open_meteo":…,"domestic_cma":…,"town_obs":…,"temp_obs_corrected":…}`；后者=**实况锚定偏差校正**（两点法，分别校高温/低温）
+- 合并脚本：**算法本体在技能目录 `scripts/merge_legs.py`（进 git，唯一真源）**；系统里 `~/.hermes/scripts/fetch_haba_weather.py` 只是 3 行 shim（cron 的 script 字段指向它），runpy 技能目录那份。**改算法只改技能目录那份**。注入 `{"open_meteo":…,"domestic_cma":…,"town_obs":…,"temp_obs_corrected":…}`；最后一项=**实况锚定偏差校正**（两点法，分别校高温/低温 + 不确定度）
 - 对比验证：`scripts/compare_sources.py`（手动跑，双源并排输出）
 
 ### 乡镇自动站接口（v1.6 关键）
