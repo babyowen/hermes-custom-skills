@@ -103,6 +103,9 @@ python3 ~/.hermes/skills/hermes-update-watch/scripts/fetch_hermes_updates.py --d
 | 5 | 把 draft / prerelease 报成"已发布" | 脚本已过滤，别自己再挑 |
 | 6 | 忘了用户环境特有的升级坑 | 见 `references/upgrade-checklist.md`（uv 重建丢包、cron model_snapshot、必须 /restart） |
 | 7 | 自动执行 `hermes update` | **禁止**。只输出命令与检查项，用户确认后再执行 |
+| 8 | 自己推算"落后 N 个 PR / N 个 commit" | 只用 `behind.*`；`capped=true` 时写"≥10000（GitHub 上限）"；不要拿 release body 的 "rolls up N PRs" 凑数 |
+| 9 | release notes 太空就写"本周无内容" | 改用 `behind.impact_commits`（按你环境关键词筛出的真实提交）+ release 的 `highlights` |
+| 10 | 升级后 `uv sync --locked` 报"锁需要更新"就以为锁坏了 | 是**索引源不一致**：pip.conf 的镜像被 pm 桥接成 `UV_INDEX_URL`，与 `pm/uv.lock` 里的 `registry` 不同 → 用 `UV_INDEX_URL=<锁里的 registry> hermes config check` 跑收尾（详见 `references/upgrade-checklist.md` §7；`upgrade_risks[]` 会提前预警） |
 
 ## References
 
@@ -110,5 +113,4 @@ python3 ~/.hermes/skills/hermes-update-watch/scripts/fetch_hermes_updates.py --d
 |:---|:---|
 | `references/sources.md` | 官方源清单、API 端点与限流、山寨源识别 |
 | `references/upgrade-checklist.md` | 本机（git 安装 + uv venv + 多 cron）升级 SOP、回滚、验证 |
-| 8 | 自己推算"落后 N 个 PR / N 个 commit" | 只用 `behind.*`；`capped=true` 时写"≥10000（GitHub 上限）"；不要拿 release body 的 "rolls up N PRs" 凑数 |
-| 9 | release notes 太空就写"本周无内容" | 改用 `behind.impact_commits`（按你环境关键词筛出的真实提交）+ release 的 `highlights` |
+

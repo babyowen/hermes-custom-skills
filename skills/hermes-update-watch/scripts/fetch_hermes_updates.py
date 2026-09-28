@@ -16,6 +16,7 @@ hermes-update-watch: 采集 Hermes Agent 官方发布动态 + 本机版本 → J
 from __future__ import annotations
 
 import argparse
+import configparser
 import json
 import os
 import re
@@ -112,6 +113,51 @@ def _iso(dt):
 
 # ---------------------------------------------------------------- 本机版本
 
+def _pip_conf_index():
+    """本机 pip.conf 的 index-url（pm 会把它桥接成 UV_INDEX_URL 传给 uv）。"""
+    for path in ("/etc/pip.conf", "/etc/xdg/pip/pip.conf",
+                 os.path.expanduser("~/.pip/pip.conf"),
+                 os.path.expanduser("~/.config/pip/pip.conf")):
+        if not os.path.isfile(path):
+            continue
+        try:
+            cp = configparser.ConfigParser()
+            cp.read(path)
+            for section in ("global", "install"):
+                if cp.has_option(section, "index-url"):
+                    return cp.get(section, "index-url").strip(), path
+        except Exception:  # noqa: BLE001
+            continue
+    value = os.environ.get("PIP_INDEX_URL") or os.environ.get("UV_INDEX_URL")
+    return (value.strip(), "env") if value else (None, None)
+
+
+def _lock_registry(lock_path):
+    """pm/uv.lock 里记录的 registry（uv --locked 要求当前源与它一致）。"""
+    try:
+        with open(lock_path, encoding="utf-8") as fh:
+            m = re.search(r'registry\s*=\s*"([^"]+)"', fh.read())
+        return m.group(1) if m else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _upgrade_risks():
+    """升级前可预判的本地风险（目前：pip.conf 镜像 vs 锁里 registry 不一致）。"""
+    risks = []
+    index, source = _pip_conf_index()
+    registry = _lock_registry(os.path.join(LOCAL_REPO, "pm", "uv.lock"))
+    if index and registry and index.rstrip("/") != registry.rstrip("/"):
+        risks.append({
+            "id": "pip-index-vs-lock-registry",
+            "detail": ("pip.conf 的 index-url (%s，来自 %s) 与 pm/uv.lock 记录的 registry (%s) 不一致 → "
+                       "升级收尾的 `uv sync --locked` 会报 \"lockfile needs to be updated\" 而卡住，"
+                       "留下 source-completion-pending 标记。" % (index, source, registry)),
+            "fix": "UV_INDEX_URL=%s hermes config check" % registry,
+        })
+    return risks
+
+
 def local_info():
     info = {"path": LOCAL_REPO, "version": None, "version_source": None,
             "commit": None, "commit_date": None, "branch": None, "is_git": False}
@@ -122,6 +168,15 @@ def local_info():
         if m:
             info["version"] = m.group(1)
             info["version_source"] = "hermes --version"
+        # CLI 自己的落后口径（与 git 的 rev-list 口径不同，两者都给出来由报告自行说明）
+        m2 = re.search(r"Update available:\s*([\d,]+)\s*commits behind", out)
+        if m2:
+            info["cli_commits_behind"] = int(m2.group(1).replace(",", ""))
+        elif "Up to date" in out:
+            info["cli_commits_behind"] = 0
+        m3 = re.search(r"upstream\s+([0-9a-f]{6,})", out)
+        if m3:
+            info["upstream_sha"] = m3.group(1)
 
     if os.path.isdir(os.path.join(LOCAL_REPO, ".git")):
         info["is_git"] = True
@@ -256,6 +311,7 @@ def collect(days):
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
     local = local_info()
+    risks = _upgrade_risks()
 
     releases_raw, tags_raw, errors = [], [], []
     try:
@@ -331,6 +387,7 @@ def collect(days):
         "pending_releases": pending,
         "pending_count": len(pending),
         "behind": behind,          # 权威：落后区间的 total_commits / files / 相关提交
+        "upgrade_risks": risks,    # 本机可预判的升级风险（如 pip 镜像 vs 锁 registry）
         "impact_for_local": _impact(pending or in_window),
         "tags_without_release": tags_no_release,
         "state": {
@@ -375,6 +432,9 @@ def digest(res):
                          % (b.get("sample_commits"), len(b["impact_commits"])))
         for c in (b.get("impact_commits") or [])[:8]:
             lines.append("   ! [%s] %s (%s)" % (c["area"], c["subject"][:130], c["sha"]))
+    for r in res.get("upgrade_risks") or []:
+        lines.append("⚠️ 升级风险 [%s]：%s" % (r["id"], r["detail"]))
+        lines.append("    修复：%s" % r["fix"])
     for r in res["pending_releases"][:6]:
         refs = "，引用 %s 处" % r["pr_count"] if r["pr_count"] else ""
         lines.append("  · %s (%s)%s" % (r["tag"], (r["published_at"] or "")[:10], refs))

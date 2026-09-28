@@ -85,3 +85,45 @@ hermes gateway restart
 - **避开 cron 密集时段**：08:30（serp）、09:00/20:00（热榜）、14:00（模型巡检）、16:00（A股）、21:00（FinNova）
 - 推荐窗口：**周六 10:30–12:00**（本技能周报出完之后，用户在场时）
 - 升级期间网关重启会中断在跑的会话，动手前跟用户说一声
+
+---
+
+## §7 已知坑：升级收尾卡在 `uv sync --locked`（本机 2026-09-28 实测踩到）
+
+**症状**：`git pull` 升级完后，每次 `hermes …` 都会多打一段：
+
+```
+Preparing the isolated Hermes runtime…
+  → Installing Python dependencies…
+  ✗ error: The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.
+hermes: no dependency environment is committed for this install; run 'hermes pm repair'
+```
+
+同时 `~/.hermes/installs/<id>/source-completion-pending`（内容 `source update tail not finished`）一直在，
+`hermes pm repair` / `hermes pm doctor` 也全部复现同一错误。
+
+**根因**：**索引源不一致**，不是锁坏了。
+
+1. 本机 `~/.pip/pip.conf` 配了镜像：`index-url = http://mirrors.tencentyun.com/pypi/simple`
+2. `pm/index_config.py` 会把 pip.conf 的 index **桥接成 `UV_INDEX_URL`** 传给 uv
+3. 而 `pm/uv.lock` 里记录的是 `source = { registry = "https://pypi.org/simple" }`
+4. uv 在 `--locked` 下要求"当前源 == 锁里的源"，于是判定"锁需要更新"→ 收尾永远失败
+
+**判定方法（10 秒）**：
+```bash
+grep -n 'index-url' ~/.pip/pip.conf              # 看本机镜像
+grep -m1 'registry' ~/.hermes/hermes-agent/pm/uv.lock   # 看锁里的源
+# 两者域名不同 → 就是这个坑
+```
+
+**修法**：跑收尾时对齐"锁记录的源"（pm 会转发 `UV_INDEX_URL`）：
+```bash
+UV_INDEX_URL=https://pypi.org/simple hermes config check
+```
+4 个包（packaging / ruamel.yaml / tomli-w / truststore）通常已在 uv 缓存里，不需真下载。
+
+**备选**：临时把 `~/.pip/pip.conf` 的 `index-url` 注释掉 → 跑收尾 → 再恢复（走腾讯云更快，但要碰用户配置，需先经用户同意）。
+
+**不要做的事**：不要在 pm/ 目录里手改 `uv.lock` 的 registry 去迁就镜像 —— 那会让这个 tracked 文件偏离上游，下次 pull 冲突。
+
+**技能侧预防**：`scripts/fetch_hermes_updates.py` 的 `upgrade_risks[]` 会在每次周报里提前报出这个不一致（有风险时升级建议里附现成修复命令）。
