@@ -202,6 +202,24 @@ def _kw_hit(kw, low):
     return kw in low
 
 
+def _impact_commits(commits):
+    """从 compare 的 commit 列表里挑出与本机相关的提交（补 release notes 太简的周）。"""
+    out = []
+    for c in commits:
+        raw = ((c.get("commit") or {}).get("message") or "").splitlines()
+        if not raw:
+            continue
+        subj = re.sub(r"\s+", " ", raw[0]).strip()
+        low = subj.lower()
+        if low.startswith(("merge ", "revert ", "chore", "docs", "test", "ci:", "style")):
+            continue
+        for k in IMPACT_KEYWORDS:
+            if _kw_hit(k, low):
+                out.append({"sha": (c.get("sha") or "")[:9], "area": k, "subject": subj[:180]})
+                break
+    return out[:15]
+
+
 def _impact(entries):
     hits = []
     for e in entries:
@@ -269,6 +287,36 @@ def collect(days):
     tags_no_release = [t.get("name") for t in tags_raw
                        if t.get("name") not in {r["tag"] for r in releases}][:5]
 
+    # 权威的"落后多少 commit"：拿本机区间跑一次 compare API（release notes 太简时的唯一硬数字）
+    behind = {}
+    pending_tags = [r["tag"] for r in pending]
+    tag_names = [t.get("name") for t in tags_raw]
+    if pending_tags and tag_names and releases:
+        oldest = pending_tags[-1]
+        if oldest in tag_names:
+            idx = tag_names.index(oldest)
+            base = tag_names[idx + 1] if idx + 1 < len(tag_names) else None
+            head = releases[0]["tag"]
+            if base and head and base != head:
+                try:
+                    cmp_data = _api("/compare/%s...%s" % (base, head), retries=1)
+                    total = cmp_data.get("total_commits")
+                    files = len(cmp_data.get("files") or [])
+                    samples = cmp_data.get("commits") or []
+                    behind = {
+                        "range": "%s...%s" % (base, head),
+                        "url": "https://github.com/%s/compare/%s...%s" % (OFFICIAL_REPO, base, head),
+                        "total_commits": total,
+                        "files_changed": files,
+                        # GitHub compare 对超大区间有硬上限：10000 commits / 300 files，
+                        # commits 列表只回最近 250 条 → capped=true 时这些数字只是下限，不许当精确值报
+                        "capped": bool((total or 0) >= 10000 or files >= 300 or len(samples) >= 250),
+                        "sample_commits": len(samples),
+                        "impact_commits": _impact_commits(samples),
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    errors.append("compare: %s" % exc)
+
     result = {
         "generated_at": _iso(now),
         "window_days": days,
@@ -282,6 +330,7 @@ def collect(days):
         "releases_in_window": in_window,
         "pending_releases": pending,
         "pending_count": len(pending),
+        "behind": behind,          # 权威：落后区间的 total_commits / files / 相关提交
         "impact_for_local": _impact(pending or in_window),
         "tags_without_release": tags_no_release,
         "state": {
@@ -293,6 +342,7 @@ def collect(days):
         "links": {
             "releases": "https://github.com/%s/releases" % OFFICIAL_REPO,
             "compare": (latest.get("compare_url")
+                        or behind.get("url")
                         or "https://github.com/%s/compare/%s...%s"
                            % (OFFICIAL_REPO, state.get("last_seen_tag") or "HEAD", latest.get("tag") or "main")),
             "docs": "https://hermes-agent.nousresearch.com/docs/",
@@ -312,6 +362,19 @@ def digest(res):
     lines.append("待升 %s 个 release，窗口内 %s 个，未装 tag: %s"
                  % (res["pending_count"], len(res["releases_in_window"]),
                     ", ".join(r["tag"] for r in res["pending_releases"][:8]) or "无"))
+    b = res.get("behind") or {}
+    if b:
+        cnt = b.get("total_commits")
+        if b.get("capped"):
+            lines.append("落后区间 %s：≥%s commits（GitHub compare 上限值，非精确——只能写 ≥ 这个数）"
+                         % (b.get("range"), cnt))
+        else:
+            lines.append("落后区间 %s：%s commits（官方 compare API，精确）" % (b.get("range"), cnt))
+        if b.get("impact_commits"):
+            lines.append("   （以下取最近 %s 个提交里的相关样本，共筛出 %s 条）"
+                         % (b.get("sample_commits"), len(b["impact_commits"])))
+        for c in (b.get("impact_commits") or [])[:8]:
+            lines.append("   ! [%s] %s (%s)" % (c["area"], c["subject"][:130], c["sha"]))
     for r in res["pending_releases"][:6]:
         refs = "，引用 %s 处" % r["pr_count"] if r["pr_count"] else ""
         lines.append("  · %s (%s)%s" % (r["tag"], (r["published_at"] or "")[:10], refs))
