@@ -45,6 +45,11 @@ python3 ~/.hermes/skills/hermes-update-watch/scripts/fetch_hermes_updates.py --d
 | `releases_in_window[]` | 最近 7 天官方发的（可能本机已装） |
 | `impact_for_local[]` | 命中你环境关键字的条目（gateway/cron/feishu/provider/skill/state.db…） |
 | `state.new_tags_since_last_report[]` | 上次报过之后新增的 tag（防重复） |
+| `behind.total_commits` / `behind.impact_commits[]` | 落后区间的官方 compare 数据（**唯一权威的 commit 数**）+ 相关提交样本 |
+
+**数字纪律（硬性）**：报告里出现的任何数量（commit 数、PR 数、文件数、天数、版本数）**只能来自 JSON**。
+`behind.capped=true` 时 `total_commits`/`files_changed` 是 GitHub compare 的**封顶值**（10000/300），只能写成"≥10000"；
+`behind.impact_commits` 只是**最近 250 个提交里的样本**，不是全量。**不许自行推算或估算**任何数字。
 
 ### ③ 出报告（中等详细度，≤40 行，决策优先）
 
@@ -105,3 +110,5 @@ python3 ~/.hermes/skills/hermes-update-watch/scripts/fetch_hermes_updates.py --d
 |:---|:---|
 | `references/sources.md` | 官方源清单、API 端点与限流、山寨源识别 |
 | `references/upgrade-checklist.md` | 本机（git 安装 + uv venv + 多 cron）升级 SOP、回滚、验证 |
+| 8 | 自己推算"落后 N 个 PR / N 个 commit" | 只用 `behind.*`；`capped=true` 时写"≥10000（GitHub 上限）"；不要拿 release body 的 "rolls up N PRs" 凑数 |
+| 9 | release notes 太空就写"本周无内容" | 改用 `behind.impact_commits`（按你环境关键词筛出的真实提交）+ release 的 `highlights` |
