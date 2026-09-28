@@ -23,7 +23,7 @@ lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 20]
 # e.g. <span data-label="Vaccines"> then actual text outside tags
 # Look for data-label OR search for key terms in the text
 for line in lines:
-    if 'Bundibugyo' in line or 'confirmed cases' in line or 'vaccine' in line.lower():
+    if 'confirmed cases' in line or 'vaccine' in line.lower():
         print(line[:300])
 ```
 
@@ -37,7 +37,7 @@ for line in lines:
 - JavaScript-rendered content (some image captions, live updates) won't appear
 - Some articles behind paywall redirect to a different layout
 
-**Verified working for**: Ebola outbreak explainers, general health news
+**Verified working for**: outbreak explainers, general health news
 
 ---
 
@@ -87,18 +87,13 @@ When `web_extract` returns 402 and `execute_code` + `httpx` fails for ECDC/WHO p
 # Verified: ecdc.europa.eu and who.int pages both work
 ```
 
-### Known URLs (stable)
-- Ebola DRC/Uganda: `https://www.ecdc.europa.eu/en/ebola-disease/surveillance-and-updates/ebola-outbreak-democratic-republic-congo-and-uganda`
-  - URL was updated from `ebola-virus-disease-outbreak-...` to `ebola-disease/surveillance-and-updates/ebola-outbreak-...`
-- Hantavirus: `https://www.ecdc.europa.eu/en/hantavirus-infection/surveillance-and-updates/andes-hantavirus-outbreak`
-- WHO situation page: `https://www.who.int/emergencies/situations/ebola-outbreak---drc-2026`
+### URL 模式（不要硬编码事件 slug）
+- ECDC 事件页：`https://www.ecdc.europa.eu/en/<topic>/surveillance-and-updates/<event-slug>`
+  - ⚠️ 事件 slug 会随事件改名/下线（旧 slug 会 404 或重定向，已实测 2026-09-28 有一个旧事件页 404），失效时回 ECDC 站内搜索按主题名重新定位
+- WHO 疫情专页：`https://www.who.int/emergencies/situations/<event-slug>`（事件结束后可能下线）；DON 列表页 `https://www.who.int/emergencies/disease-outbreak-news` 长期稳定（实测 200）
+- ✅ 追踪具体事件时以 `fixed-tracking-items.md` 登记的**活跃项**为准；无活跃项则不访问这些页面
 
-### Known URLs (stable)
-- Ebola DRC/Uganda: `https://www.ecdc.europa.eu/en/ebola-outbreak-democratic-republic-congo-and-uganda`
-  - ⚠️ URL changed: old path `ebola-virus-disease-outbreak-...` now redirects; the `ebola-outbreak-...` slug is the current working URL (verified 2026-06-07)
-- Hantavirus: `https://www.ecdc.europa.eu/en/hantavirus-infection/surveillance-and-updates/andes-hantavirus-outbreak`
-
-**Verified working for**: Ebola outbreak, Hantavirus outbreak
+**Verified working for**: 疫情/突发事件类页面（ECDC、WHO）
 
 ---
 
@@ -326,7 +321,7 @@ resp = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
 ### Limitations
 - Some DON pages are stub pages that redirect to a "page not found"
 - WHO site uses Drupal, content can be in different containers
-- Better to use ECDC for Ebola data as it has cleaner structured updates
+- Better to use ECDC for outbreak data as it has cleaner structured updates
 
 ---
 
@@ -357,5 +352,4 @@ If the page contains `PoWConfig` or `var __assign`, it's not a valid search resu
 - **If you must use Bing**: Add longer delay between requests, rotate User-Agent, or try Bing News (`news.search`) instead of main Bing search
 
 ### Verified trigger queries
-- `Hondius hantavirus ship outbreak 2026` — triggered PoW challenge
-- `Ebola Bundibugyo DRC 2026 outbreak` — returned partial results but with PoW in some cases
+- 含 3+ 英文词的事件类查询（`<事件专名> <年份> outbreak` 形式）— 高概率触发 PoW challenge

@@ -27,8 +27,8 @@ for block in blocks[:5]:
 
 ### ⚠️ Inconsistent Results
 DuckDuckGo HTML search **does not return results for all queries**. In testing:
-- `"Hondius" virus outbreak hantavirus 2026` → ✅ Good results (WHO, Wikipedia, ECDC)
-- `Ebola DRC Uganda Bundibugyo 2026 outbreak` → ❌ Empty results
+- 含明确英文事件专名的查询（如 `<event name> 2026`）→ ✅ Good results（WHO、Wikipedia、ECDC 等）
+- 泛化健康/疾病类查询（如 `<disease> <country> 2026 outbreak`）→ ❌ Empty results
 - `Blue Origin New Glenn rocket explosion 2026` → ❌ Empty results
 
 Likely causes: query language (English works better than Chinese on this endpoint), query "hotness"/popularity, or rate-limiting/throttling.
@@ -43,5 +43,5 @@ DuckDuckGo wraps result URLs in redirect links (`//duckduckgo.com/l/?uddg=<encod
 Use DuckDuckGo after SerpAPI, before Google News httpx fallback. It is a tier-4 option (after SerpAPI, Wikipedia API, Google News).
 
 ## When NOT to Use
-- If Wikipedia API can answer the query directly (Ebola stats, disease outbreaks, known events)
+- If Wikipedia API can answer the query directly（疫情统计、疾病爆发、已知事件）
 - If the query is in Chinese (DuckDuckGo HTML endpoint has poor Chinese search performance)

@@ -1,10 +1,11 @@
 # WHO DON 浏览器提取指南
 
 > 创建：2026-06-10 | 验证版本：DON #605（5/29）和 #606（6/8）
+> ⚠️ 本指南只描述**方法**：追踪哪个事件由 `fixed-tracking-items.md` 的活跃项决定（当前无活跃项）。
 
 ## 为何需要此指南
 
-Exa 额度耗尽时 `web_search`/`web_extract` 返回402。WHO DON 页面是追踪埃博拉等疫情的最佳数据源，但 httpx 直连可能因JS渲染截断内容。`browser_navigate` 可完整读取。
+Exa 额度耗尽时 `web_search`/`web_extract` 返回402。WHO DON 页面是追踪国际疫情/公共卫生事件的最佳数据源，但 httpx 直连可能因JS渲染截断内容。`browser_navigate` 可完整读取。
 
 ## 步骤
 
@@ -16,8 +17,8 @@ Exa 额度耗尽时 `web_search`/`web_extract` 返回402。WHO DON 页面是追�
 # 通过 browser_navigate 打开列表页
 browser_navigate("https://www.who.int/emergencies/disease-outbreak-news")
 # snapshot 中可看到最近条目列表，例如：
-# "8 June 2026 | Ebola disease caused by Bundibugyo virus, DRC & Uganda"
-# "29 May 2026 | Ebola disease caused by Bundibugyo virus, DRC & Uganda"
+# "8 June 2026 | <事件名称>, <国家/地区>"
+# "29 May 2026 | <事件名称>, <国家/地区>"
 ```
 
 ### 2. 直接导航到详情页
