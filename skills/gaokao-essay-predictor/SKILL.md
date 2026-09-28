@@ -21,39 +21,20 @@ metadata:
 ## 核心数据
 
 ### 参考资料库
-
 | 文件 | 说明 |
 |:----|:------|
 | `references/历年作文题汇编.md` | 2016-2025年完整作文题原文（多源交叉验证） |
 | `references/jiangsu_gaokao_essay_analysis_2016_2020.md` | 江苏卷时期权威解析+高分作文特点 |
-| `references/gaokao_essay_analysis_2021_2025.md` | 新高考I卷时期官方评析+高分作文特点 |
-| `references/2025-2026年度热点综述.md` | 全年28个热点事件+作文切入角度 |
-| `references/2026趋势分析与预测方向.md` | 10年规律→4个预测方向+低概率方向（更新于2026-05-22） |
-| `references/命题特点与规则.md` | 高考命题原则+注意事项（2026年更新） |
-| **`references/教育部命题方向.md`** | **⚠️ 预测依据：教学〔2026〕1号原文+三大核心要求+官方命题原则** |
-| `references/热点素材库.md` | 按可考性排序的动态热点库 — **⚠️ 已迁移至飞书，以此为缓存** |
-| `references/作文素材库.md` | 可复用素材库（金句+人物+事件+适用度速查） — **⚠️ 已迁移至飞书，以此为缓存** |
-| `references/各方向最低保障思路.md` | 考场上时间不够时的保底方案 — **⚠️ 已迁移至飞书，以此为缓存** |
-| **`references/2025-2026整数纪念年清单.md`** | **✅ 新增 — 整数纪念年起点数据：已确认+待验证的周年事件+思辨角度速查** |
+
+完整内容见 `references/resources.md`。
 
 ### 飞书文档映射
-
 每天动态更新的三个文档已迁移到飞书，用户可通过链接直接查看。cron 运行时使用飞书 CLI 读取和更新。
-
 | 文档 | doc_token | 飞书链接 |
 |:----|:----------|:---------|
 | 📂 高考作文预测（文件夹） | U8DUfCMCelQxXBdy0CLcFHOhnN8 | https://www.feishu.cn/drive/folder/U8DUfCMCelQxXBdy0CLcFHOhnN8 |
-| 📊 热点素材库 | LBVKdoNRYoXk62xreFucshXNnUe | 在文件夹中 |
-| 📝 作文素材库 | NrOLd6DQoo8tv6xF6VQcOFQ6npg | 在文件夹中 |
-| 🛡️ 保障思路 | Ss40dKnasoh6OVxhXiTcJaKZnme | 在文件夹中 |
 
-操作方法：
-- **读取**：`lark-cli docs +fetch --doc <token> --format pretty`
-- **更新（全量覆盖）**：`cat <file> | lark-cli docs +update --doc <token> --markdown - --mode overwrite`
-  ⚠️ **必须加 `--mode overwrite`，否则报错 `--mode is required`！** 后续如需追加/部分替换，改用 `--mode append` 或 `--mode replace_range`。
-- **读取后保存本地缓存**：`lark-cli docs +fetch --doc <token> --format pretty > references/<文件名>`
-  （飞书更新后务必同步保存本地缓存文件，保持两者一致）
-- ⏱ **每次更新素材库内容时，必须在对应条目末尾或文档顶部标注更新日期**，如 `（更新于2026-05-22）`，让用户知道内容的新鲜程度
+完整内容见 `references/resources.md`。
 
 ### 关键规律
 
@@ -183,50 +164,12 @@ metadata:
 ## 每日执行细节（cron运行指南）
 
 ### 搜索策略：考前冲刺期·年度全景扫描
-
 > ⚠️ **考前冲刺期**：不再追踪本周事件。以下搜索策略聚焦**年度核心热点回顾**，像命题组一样回看全年。
-
 **第一层：年度热点全局复盘**
 - 2025年 年度盘点 大事件 社会热点 中国
 - 2025年度十大新闻 年度关键词
-- 2025年 科技重大突破 年度盘点
-- 2026年1月至今 重大事件 热点
-- 2026年高考作文热点素材 年度
 
-**第二层：热点方向识别——追踪各地模拟考确认热点**
-- 2026高三模拟考 作文题 新高考I卷
-- 2026 江苏 一模 二模 作文
-- 2026 苏锡常镇 二模 作文
-- 多地反复出现的方向 → 年度公认热点 → 高考可考性高
-- ⚠️ **不要在报告中制作「排除等级」表格**。不标记任何方向为「排除」「预警」「警惕」。模拟考热点不是排除信号，恰恰相反——它是该方向热度的证明。报告只需列出观察到的主流热点方向，不做排除判断。
-
-**第三层：官方信源（回溯全年权威金句与核心事件）**
-- 聚焦全年层面的重大政策发布会/外交场合/文化现象，而非本周事件
-- 重点关注全年级别的：领导人年度讲话金句/国家级教育政策主线/重大外交事件/文化现象级事件
-- 抓取的应是**贯穿全年**的关键金句（如「共同体」「含科量」「高质量发展」「新时代新征程」等），而非某个新发言
-- 回溯：《政府工作报告》2026版中的教育/科技段落；2025年国庆讲话；2026两会热点
-
-**第四层（新增）：整数纪念年扫描 — 追查2025-2026年重要事件周年**
-- **启动前先读** `references/2025-2026整数纪念年清单.md` — 该文件是起点数据，列出已知纪念年和思辨角度，避免重复发现
-- **搜索方式**：systematic search to complement and verify the existing list
-- 「2025年 2026年 XX周年 纪念 大事件 中国 盘点」
-- 「2025 2026 周年 整数 纪念日 大事记」
-- 「2025 2026 周年 50 40 30 20 周年 重大事件」
-- 「2026年 纪念 周年 历史事件 教育」
-- 关注范围：20/25/30/35/40/45/55/60/70/75/80/90/100周年均有可能
-- 判断标准：事件本身有思辨空间 > 与教育部方向匹配 > 全国性（非地域性） > 年度热度
-- ⚠️ 注意：不要写成政治表态——重点是从纪念事件中提取的思辨角度，而非歌颂纪念日本身
-- ⚠️ 注意：不要求全覆盖所有整数年——找到最有思辨价值的2-3个即可
-- ⚠️ 注意：长征90周年已被多家预测平台标注，不要因此轻视——被广泛提及反而说明共识度高
-- ⚠️ 冲刺期新发现处理原则：在考前冲刺期（距高考≤2周）发现的整数纪念年，应视为**对已有方向的素材补充**而非新方向——将其归类到最匹配的已有方向下（如中国动画100周年→文化创新创造方向），更新素材库并提升该方向的可信度论证，而非开辟新方向
-- 找到后将其归类到最匹配的已有方向下，添加到热点素材库对应方向条目的「核心素材」中
-
-**第五层：外部预测趋势追踪（验证+补充视角）**
-- 搜索「2026高考作文预测」「新高考I卷作文」等关键词，看主要预测平台的共识方向
-- 用途：不是照搬，而是验证自己的判断 + 发现可能遗漏的角度
-- 如果外部预测与自己的判断一致 → 增强信心；如果不一致 → 用教育部方向+公平性+思辨空间三重标准重新评估
-- 整理成「外部预测趋势追踪」表，放在热点素材库中供参考
-- 示例：长征90周年被多家平台标为「必考级」——注意：被广泛提及表示共识度高，纳入核心视角
+完整内容见 `references/search-strategy.md`。
 
 ### 素材库维护注意事项
 
@@ -271,42 +214,12 @@ terminal(command="cat <文件路径> | lark-cli docs +update --doc <token> --mar
 ⚠️ 绝对不要用 `patch` 修改 Feishu 导出的文件——引号转义会逐层恶化。
 
 ## 反例与黑名单（速查）
-
 | 类别 | ❌ 别这么干 | ✅ 应该怎么做 |
 |:----|:-----------|:------------|
 | 📡 搜索 | 搜索提取链路 | 按标准链路：web_search(Parallel)→web_extract→降级browser |
 | 📡 搜索 | curl 硬爬被 WAF 挡 | 换 browser_navigate（完整浏览器渲染），或用搜索结果摘要代替 |
-| 📝 飞书 | `lark-cli docs +update` 不加 `--mode` | 必须加 `--mode overwrite`（全量覆盖）或对应模式 |
-| 📝 飞书 | 用 `patch` 改飞书导出的文件 | **绝对禁止**——引号转义会逐层恶化，用 `write_file` 全文覆盖 |
-| 📝 飞书 | 更新飞书后不同步本地缓存 | 更新后马上：`lark-cli docs +fetch --doc <token> --format pretty > references/<文件名>` |
-| ⚙️ cron | cron prompt 写了一大段自有的逻辑 | cron prompt 只写"按 skill 执行"+交付地址，所有流程放 SKILL.md |
-| ⚙️ cron | deliver 设成 `origin` | 高考日报必须设成 `feishu:oc_5d97d211e77becee79ff4241a4b10568` |
-| 🎯 预测 | 冲刺期还追当周热点 | 回看全年，像命题组一样思考 |
-| 🎯 预测 | 写政治表态/纯科技叙事 | 剥去政治外衣，提取哲学思辨内核；科技必须配人文 |
 
-> 完整 26 条陷阱清单见 `references/已知陷阱清单.md`
-
-**❗已知陷阱**
-0. **⚠️ 搜索链路（Parallel 免费 MCP）**：搜索走 web_search(Parallel)，提取走 web_extract(Parallel)，提取失败降级 browser_navigate(本地Chrome) + eval body.innerText。全部免费。
-
-1. **`--mode` 参数必填陷阱**：`lark-cli docs +update` 必须带 `--mode overwrite`（全量覆盖）或对应模式。如果缺了 `--mode`，命令静默失败报 `--mode is required`，不会更新飞书文档。写 cron job 前务必验证该命令可用。
-2. **本地缓存文件不存在陷阱**：`references/热点素材库.md` 等标记为"以此为缓存"的文件可能不存在于磁盘上。首次运行时需要用 `lark-cli docs +fetch --doc <token> --format pretty > references/<filename>` 创建缓存。飞书更新后**必须**同步保存本地缓存，否则下次运行读取到的是过时版本。
-3. **参考资料文件集体缺失陷阱**：references/目录下大部分文件（历年作文题汇编.md、教育部命题方向.md、2026趋势分析与预测方向.md、命题特点与规则.md、2025-2026年度热点综述.md、jiangsu/gaokao分析文件等）最初可能均不在磁盘上。不要因此卡住——这些是可选/上下文参考文件，并非执行必需的。直接从飞书拉取三个核心文档（热点素材库、作文素材库、保障思路）即可运行。教育部命题方向.md虽然是"首要步骤"，但若不存在，应通过 web_search 搜索"2026教育部命题方向"或"教学〔2026〕1号"来获取最新政策表述。首次运行后不会立即完全填充所有文件，重点维护飞书文档和三个核心缓存。
-4. **重新编号陷阱（已过时）**：目前热点素材库使用方向名称（方向A/方向B）而非数字编号，无需重排编号。如果未来改用编号格式，操作时须注意。
-5. **表格格式陷阱**：向作文素材库追加事件时，新表格的加入可能使上游条目标题和表格之间的关联断裂——每追加一个Event后务必检查上一个Event的结尾格式正确
-6. **patch唯一性**：在markdown文件中使用patch时，old_string必须严格唯一。若无法唯一（如多行表头相同），改用edit（全文覆盖）或先确认唯一上下文
-9. **⚠️ cron prompt 覆盖技能指令陷阱**：cron 的 prompt 不应包含与 skill 重复或冲突的业务逻辑。cron 只做定时触发 + 交付地址设定，所有流程/规则/能力都放在 skill 的 SKILL.md 中。如果 cron prompt 里写了一大段自己的指令，它会覆盖 skill 的内容，导致 skill 更新后 cron 仍然执行旧的逻辑。本次会话中这个问题就导致了「模拟考排除」旧逻辑在技能已更新后仍然持续产出。创建/更新 cron 任务时确保 prompt 极简，只引用 skill 名和 deliver 地址。
-7. **⚠️ Feishu导出文件的引号转义陷阱**：`lark-cli docs +fetch` 导出的 lark-table 格式中，所有文本字段使用 `\"`（反斜杠-引号）包裹而非标准 `"`（普通引号）。这意味着：
-   - 直接搜索 `"融入科技前沿动态"` 匹配不到文件中的 `\"融入科技前沿动态\"`
-   - 搜索 `\"融入科技前沿动态\"` 则因为作为子串出现在大量 HTML 属性标记中而爆出数百个匹配
-   - **解决**：使用比普通引号上下文更多的相邻行（3-5行文本+标签）做 old_string，而非单独依赖引号内容本身
-   - **⚠️ 绝对不要用 patch 修改 Feishu 导出的文件**：patch 无法识别 `\\\"` 转义，会把输入中的 `\"` 当作未转义字符，每次 patch 都会给已转义的引号再套一层反斜杠（`\\\"` → `\\\\\\\"` → `\\\\\\\\\\\\\\\"`），造成逐层恶化。这种损坏不可逆——下一次 patch 只会越修越糟。**必须用 write_file 做全文覆盖**，然后用 `cat <file> | lark-cli docs +update --doc <token> --markdown - --mode overwrite` 推送飞书。这是唯一安全的操作路径。
-   - **✅ execute_code 替代模式**：可用 `from hermes_tools import write_file, read_file, terminal` 在 Python 中完成文件读写和终端命令，避免 shell 中直接文件重定向触发 dotfile overwrite 安全告警。先 `terminal()` 调 lark-cli fetch，再用 `write_file()` 写缓存。
-8. **⚠️ 双目录缓存同步陷阱**：cron 运行时，技能引用文件可能分布在两个目录：
-   - `~/.hermes/skills/gaokao-essay-predictor/references/` — 技能自身目录（**首要维护目标**）
-   - `~/.hermes/hermes-agent/skills/gaokao-essay-predictor/references/` — 工作副本目录
-   - cron 的 `workdir` 可能指向 hermes-agent 目录，导致工具默认使用工作副本的 references/
-   - **解决**：更新飞书后，务必用 `cp` 在两个目录间同步三个核心缓存文件（热点素材库.md、作文素材库.md、各方向最低保障思路.md）
+完整内容见 `references/blacklist.md`。
 
 ## 报告产出格式（必须遵守）
 
@@ -398,16 +311,10 @@ terminal(command="cat <文件路径> | lark-cli docs +update --doc <token> --mar
 - 不要使用 `origin`（会投递到私聊而非群聊）
 
 ### lark-cli 维护
-
 lark-cli 需要保持最新，否则 `docs +fetch` / `docs +update` 等命令会出现 `[deprecated] using v1 API` 警告。
-
 - 检查更新：`lark-cli update --check`
 - 执行升级：`lark-cli update`
 - 当前已升级至 **1.0.47**（2026-06-04）
-- **⚠️ v1 警告的实际情况**：`[deprecated] using the v1 API` 警告仍然存在。来自 lark-doc skill 版本而非 lark-cli 本身。功能不受影响。
-  - **这不是功能阻塞**：v1 兼容模式下命令仍然正常运行（返回 `"ok": true` 和正确的文档更新结果），警告只是提示信息。
-  - **实操建议**：每次 cron 运行开始时执行 `lark-cli update` 保持最新，但不要假设升级后警告会消失。检查 lark-doc skill 是否有 v2 版本：`lark-cli skill view lark-doc`。如果仍有警告，正常执行命令即可，功能不受影响。
-- **⚠️ lark-table HTML 标签被剥离（5月30日发现）**：lark-cli 1.0.44 + 同步升级后的 lark-doc skill，在执行 `docs +update` 时不再保留 `<lark-table>`/`<lark-tr>`/`<lark-td>` 标记。更新返回的 `warnings` 中会提示 `[WARNING:UNSUPPORTED_HTML_TAG] unsupported HTML tag removed`。文档内容（文字）仍然完整更新，但表格格式丢失——表格变成纯文本/列表格式。
-  - **排查经过**：升级 1.0.43→1.0.44 时 skills 同步更新（26 official, 26 updated），新版 lark-doc skill 不再支持这些私有 HTML 标签。
-  - **影响范围**：热点素材库.md 中的「外部预测趋势追踪」表格（lark-table 格式）在更新后失去表格排版，变为纯文本。
-  - **当前评估**：内容完整保留（功能不受阻），仅表格视觉效果变差。如果后续 Feishu 文档的表格排版对用户阅读体验至关重要，需关注 lark-doc skill 后续版本是否会恢复 lark-table 支持，或在本地维护两份格式（markdown 版提交飞书，表格版留本地缓存供 agent 读取）。
+
+完整内容见 `references/lark-cli.md`。
+
