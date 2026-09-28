@@ -1,6 +1,8 @@
 # 固定追踪项（每日热榜精读 cron 自动执行）
 
-以下全球公共卫生事件在每次执行时自动搜索最新进展，直到确认"已解决"。
+> ⛔ **当前无活跃追踪项（截至 2026-09-28）**。本文件仅为**历史存档**：不得据本文件去搜索、刷新或撰写任何“追踪”板块。
+> 已停止项：洪迪厄斯号（2026-05-29 解除）、刚果（金）埃博拉（2026-08-04 用户指示停止）。
+> 若用户要求恢复追踪，先与用户确认，再把该项登记为“活跃”。
 
 ---
 
@@ -22,7 +24,7 @@
 **WHO 状态：** 2026年5月16日宣布为 **PHEIC**。风险：国家极高 / 区域高 / 全球低。
 
 #### 数据提取
-- **最佳搜索词：** `Ebola DRC Uganda Bundibugyo outbreak 2026`
+- **（存档，默认不使用）历史搜索词：** `Ebola DRC Uganda Bundibugyo outbreak 2026`
 - **🥇 WHO DON浏览器提取**（browser_navigate直接打开WHO DON页面，URL模式 `who.int/emergencies/disease-outbreak-news/item/2026-DON6xx`）→ 最可靠，无CAPTCHA。
 - **🥈 WHO DON httpx**（who.int/emergencies/disease-outbreak-news/）→ 主列表可提取，但详情页可能被JS截断。
 - ⚠️ Wikipedia API返回200但extract为空；网页版返回403。

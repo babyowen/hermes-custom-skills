@@ -16,7 +16,7 @@
 import httpx, re
 
 resp = httpx.get(
-    "https://news.google.com/search?q=Hondius+ship+virus+outbreak&hl=en-US&gl=US&ceid=US:en",
+    "https://news.google.com/search?q=<URL编码后的关键词>&hl=en-US&gl=US&ceid=US:en",
     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
     follow_redirects=True,
     timeout=10
@@ -41,7 +41,8 @@ lines = [l.strip() for l in text.split('\n')
 
 ```python
 for line in lines:
-    if any(kw in line for kw in ['Ebola', 'case', 'outbreak', 'WHO', 'DRC', 'Uganda', 'Bundibugyo']):
+    KEYWORDS = ['WHO', 'CDC', 'outbreak', '通报']  # ← 换成你要追踪的关键词
+    if any(kw in line for kw in KEYWORDS):
         print(line[:200])
 ```
 
@@ -86,7 +87,7 @@ def search_google_news(query, lang='en-US', region='US'):
     return lines
 
 # 使用示例
-articles = search_google_news("Ebola Bundibugyo DRC Uganda 2026")
+articles = search_google_news("<事件关键词>")  # 例："typhoon 2026 landfall"、"rare earth export ban 2026"
 for line in articles[:30]:
     print(line)
 ```
@@ -96,5 +97,5 @@ for line in articles[:30]:
 当以下条件满足时，直接使用此方案代替 `web_search`：
 1. `web_search` 返回 402（Exa 额度耗尽）
 2. `web_extract` 同样 402
-3. 需要追踪特定事件（如 Hondius、Ebola）的最新进展
+3. 需要追踪特定事件（突发事件专名、持续事件）的最新进展
 4. 不需要具体文章的直链 URL（仅需知道最新动态描述）

@@ -33,7 +33,7 @@
 
 ```bash
 # 英文搜索（查询词用空格分隔即可）
-curl -s --max-time 15 "https://lite.duckduckgo.com/lite/?q=Hondius+virus+outbreak+quarantine+2026" \
+curl -s --max-time 15 "https://lite.duckduckgo.com/lite/?q=rare+earth+export+ban+2026" \
   -H "User-Agent: Mozilla/5.0" -o /tmp/ddg_results.html
 
 # 中文搜索
@@ -70,7 +70,7 @@ titles = re.findall(r'uddg=[^&"\']+[^>]*>([^<]+)<', html)
 ```bash
 # 英文搜索
 curl -s --max-time 15 -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-  'https://www.bing.com/news/search?q=Hondius+ship+virus+outbreak+2026&FORM=HDRSC7' \
+  'https://www.bing.com/news/search?q=rare+earth+export+ban+2026&FORM=HDRSC7' \
   -o /tmp/bing_results.html
 
 # 中文搜索
@@ -225,7 +225,7 @@ paragraphs = re.findall(r'<p>(.*?)</p>', resp2.text, re.DOTALL)
 Google News 的 HTML 很庞大但结构清晰，可用 `execute_code` 解析。**注意：不能用管道 `curl | python`，必须分步：curl 下载 → execute_code 解析。**
 
 ```bash
-curl -s --max-time 15 "https://news.google.com/search?q=Ebola+Bundibugyo+DRC+2026&hl=en-US&gl=US&ceid=US:en" \
+curl -s --max-time 15 "https://news.google.com/search?q=rare+earth+export+ban+2026&hl=en-US&gl=US&ceid=US:en" \
   -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
   -o /tmp/google_news.html
 ```
@@ -249,7 +249,7 @@ articles = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', html)
 # 按关键词筛选（用 Python 过滤相关结果）
 for url, title in articles:
     title_clean = title.strip()
-    if any(kw in title_clean for kw in ['Ebola', 'Bundibugyo', 'CDC', 'WHO']):
+    if any(kw in title_clean for kw in ['CDC', 'WHO', 'report']):  # ← 换成你要追踪的关键词
         print(f"{title_clean} -> {url}")
 ```
 
@@ -259,7 +259,7 @@ for url, title in articles:
 import httpx, re
 
 resp = httpx.get(
-    "https://news.google.com/search?q=Ebola+DRC+Bundibugyo+2026&hl=en-US&gl=US&ceid=US:en",
+    "https://news.google.com/search?q=rare+earth+export+ban+2026&hl=en-US&gl=US&ceid=US:en",
     headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
     timeout=15
 )
@@ -279,22 +279,22 @@ for url, title in articles:
 
 ## 源站直连（有具体 URL 时最有效）
 
-当追踪特定事件（如洪迪厄斯号、埃博拉）时，不要依赖搜索引擎，直接去权威来源获取最新数据：
+当追踪特定事件时，不要依赖搜索引擎，直接去权威来源获取最新数据：
 
 ### Al Jazeera 新闻列表页（验证：2026-05-26）
 
-Al Jazeera 的标签/主题页（如 `/tag/ebola/`）是获取国际突发公共卫生事件最新进展的可靠来源——无需搜索，直接访问聚合页即可获取最新标题列表。
+Al Jazeera 的标签/主题页（URL 形如 `/tag/<topic-slug>/`，已实测可用 `/tag/climate-crisis/`、`/tag/floods/`）是获取国际突发事件最新进展的可靠来源——无需搜索，直接访问聚合页即可获取最新标题列表。
 
 ```bash
-curl -s --max-time 15 -L "https://www.aljazeera.com/tag/ebola/" \
-  -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" -o /tmp/aj_ebola.html
+curl -s --max-time 15 -L "https://www.aljazeera.com/tag/<topic-slug>/" \
+  -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" -o /tmp/aj_tag.html
 ```
 
 **解析策略**：HTML 含大量 CSS-in-JS 和 styled-components，但文章标题可通过正则从原始 HTML 提取。去 script/style 后，扫描 `<a>` 标签中含义关键字的文本：
 
 ```python
 import re
-with open('/tmp/aj_ebola.html') as f:
+with open('/tmp/aj_tag.html') as f:
     html = f.read()
 html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
 html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
@@ -302,23 +302,23 @@ text = re.sub(r'<[^>]+>', '\n', html)
 lines = [l.strip() for l in text.split('\n') if l.strip() and len(l.strip()) > 30]
 # 过滤含关键词的行
 for l in lines[:60]:
-    if any(kw in l for kw in ['Ebola', 'case', 'death', 'outbreak', 'WHO', 'Tedros', 'vaccine', 'DRC', 'Uganda', 'Bundibugyo']):
+    if any(kw in l for kw in ['case', 'death', 'outbreak', 'WHO', 'vaccine']):  # ← 换成你要追踪的关键词
         print(l[:200])
 ```
 
-**已验证内容**：返回 WHO 总干事谭德塞评论、病例数更新、乌干达输入病例、治疗中心纵火事件等——覆盖完整。
+**已验证内容**：标签页返回该主题下最近文章标题列表（含官方表态、事件进展、数据更新等）——覆盖完整。
 
-### CDC Newsroom（特定事件）
-# WHO Disease Outbreak News
-curl -s --max-time 15 -L "https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON601" \
+### 源站直连示例（WHO / CDC / Wikipedia）
+# WHO Disease Outbreak News（DON 编号按年递增，URL 形如）
+curl -s --max-time 15 -L "https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON6xx" \
   -H "User-Agent: Mozilla/5.0" -o /tmp/who_page.html
 
-# CDC Newsroom（特定事件）
-curl -s --max-time 15 -L "https://www.cdc.gov/media/releases/2026/cdc-provides-update-on-hantavirus-outbreak-linked-to-m-v-hondius-cruise-ship.html" \
+# CDC Newsroom（事件页 slug 随事件变化，从新闻室列表页取当期链接）
+curl -s --max-time 15 -L "https://www.cdc.gov/media/releases/2026/<event-slug>.html" \
   -H "User-Agent: Mozilla/5.0" -o /tmp/cdc_page.html
 
-# Wikipedia（事件背景+时间线）
-curl -s --max-time 15 -L "https://en.wikipedia.org/wiki/MV_Hondius_hantavirus_outbreak" \
+# Wikipedia（事件背景+时间线，页面标题用英文下划线形式）
+curl -s --max-time 15 -L "https://en.wikipedia.org/wiki/<Event_Article_Title>" \
   -H "User-Agent: Mozilla/5.0" -o /tmp/wiki_page.html
 ```
 
@@ -388,17 +388,17 @@ for article in articles[:3]:
 
 ### Wikipedia API（结构化 JSON，推荐用于已知主题）
 
-Wikipedia 的 JSON API 是追踪已知事件（如 Hondius、Ebola）的**最佳回退方案**——无速率限制、结构化响应、直接返回纯文本。
+Wikipedia 的 JSON API 是追踪已知事件（只要该事件有独立条目）的**最佳回退方案**——无速率限制、结构化响应、直接返回纯文本。
 
 ```bash
 # 标准 API 查询（获取概述）
-curl -s "https://en.wikipedia.org/w/api.php?action=query&titles=MV_Hondius_hantavirus_outbreak&prop=extracts&exintro=true&explaintext=true&format=json"
+curl -s "https://en.wikipedia.org/w/api.php?action=query&titles=<Event_Article_Title>&prop=extracts&exintro=true&explaintext=true&format=json"
 
 # 完整文本（不含 exintro 限制）
-curl -s "https://en.wikipedia.org/w/api.php?action=query&titles=2026_Ituri_Province_Ebola_epidemic&prop=extracts&explaintext=true&format=json"
+curl -s "https://en.wikipedia.org/w/api.php?action=query&titles=<Event_Article_Title>&prop=extracts&explaintext=true&format=json"
 
-# 搜索 Wikipedia 页面
-curl -s "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=Ebola+Bundibugyo+outbreak+2026&format=json"
+# 先搜索定位页面标题，再按上面取正文
+curl -s "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=<关键词>&format=json"
 ```
 
 **解析方式**（Python，无需 urllib.parse 等复杂库）：
@@ -412,10 +412,10 @@ for pid, pdata in pages.items():
     # extract 已为纯文本，直接使用
 ```
 
-**经验证可用的 Wikipedia 主题**：
-- `MV_Hondius_hantavirus_outbreak` — 全面时间线、病例数、WHO/CDC 响应
-- `2026_Ituri_Province_Ebola_epidemic` — 病例数、传播路径、疫苗状况
-- `Bundibugyo_ebolavirus` — 病毒学背景、历史爆发
+**用法要点**：
+- 事件若有独立条目（英文下划线标题），可直接取概述与完整时间线
+- 疾病/病毒学背景条目通常单独存在，可作为事件条目的补充
+- ⚠️ 具体查哪个条目由 `fixed-tracking-items.md` 的活跃追踪项决定；无活跃项时不主动检索
 
 **优势**：零配置、JSON 响应、无限流（合理使用下）、纯文本无需 HTML 解析。
 
@@ -469,7 +469,7 @@ for t in titles[1:]:  # 第 0 条是 "Google News" 标题
 ```bash
 curl -s -L --max-time 10 \
   -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-  "https://html.duckduckgo.com/html/?q=Hondius+cruise+ship+virus+outbreak+2026"
+  "https://html.duckduckgo.com/html/?q=rare+earth+export+ban+2026"
 ```
 
 **解析**：
@@ -487,7 +487,7 @@ snippets = re.findall(r'class="result__snippet"[^>]*>(.*?)</(?:a|td)>', html, re
 **适用场景**：
 - web_search 402 额度耗尽
 - DuckDuckGo/Bing/Google 全部触发 CAPTCHA 或限流
-- 追踪特定事件（如洪迪厄斯号、埃博拉疫情）需要"目前已知的最新状态"
+- 追踪特定事件需要“目前已知的最新状态”
 - 不需要"最新新闻"时（因为 session_search 不能产生新的外部数据）
 
 **使用方法**：
@@ -496,7 +496,7 @@ from hermes_tools import session_search
 
 # 搜索历史会话中关于追踪事件的最新状态
 results = session_search(
-    query="洪迪厄斯号 Hondius 已解决 追踪",
+    query="固定追踪项 最新状态进展",
     limit=5
 )
 # 返回的 results 中包含每个匹配会话的：
@@ -517,26 +517,22 @@ results = session_search(
 - ✅ 比完全不报好得多——至少能维持追踪的连续性
 
 **实战示例**（2026-05-27 每日热榜精读）：
-当 web_search/web_extract 全部失败、DuckDuckGo 触发 CAPTCHA、Google 返回插入页时，使用：
-```
-session_search(query="洪迪厄斯号 刚果 埃博拉 每日热榜精读", limit=3, sort='newest')
-```
-成功回收到 2026-05-26 晚（约12小时前）的追踪数据：洪迪厄斯号10确诊+2疑似、3死、船员全阴；埃博拉超900疑似、三国部长会议等——足以维持报告质量。
+当所有外部搜索通道全部失效时，用 session_search 回收上一次运行的状态快照，足以维持报告的连续性。
 
 ---
 
-### WHO AFRO 官网直连（追踪埃博拉等非洲疫情的最佳回退）
+### WHO AFRO 官网直连（非洲区域事件的官方回退）
 
-当搜索埃博拉疫情但所有搜索引擎均失效时，**WHO 非洲区域办公室官网**是获取最新官方数据的可靠来源。URL 结构稳定，HTML 响应友好。
+当所有搜索引擎均失效时，**WHO 非洲区域办公室官网**是获取非洲区域事件官方数据的可靠来源。URL 结构稳定，HTML 响应友好（`/news` 列表页实测 200）。
 
-**已知可用 URL 模式**：
+**URL 模式**：
 ```
 # 新闻列表页
 https://www.afro.who.int/news
 
-# 具体新闻页（可预测 slug 模式）
-https://www.afro.who.int/countries/uganda/news/intensifying-cross-border-collaboration-curb-ebola-outbreak
-https://www.afro.who.int/news/high-level-ministerial-meeting-cross-border-coordination-ebola-disease-outbreak-caused
+# 具体新闻页（slug 随文章标题变化，需从列表页取当期链接）
+https://www.afro.who.int/news/<article-slug>
+https://www.afro.who.int/countries/<country>/news/<article-slug>
 ```
 
 **提取策略**：
@@ -558,10 +554,10 @@ if idx < 0:
 ```
 
 **已验证提取内容**（2026-05-27）：
-- 三国部长级会议联合公报全文（DRC、Uganda、South Sudan）
-- 流行病学数据："截至5月20日，伊图里省和北基伍省确认传播"
-- 具体承诺：加强跨境监测、入境点协调、社区动员等6点行动计划
-- 发布时间：2026-05-23
+- 新闻页正文（公报/声明/通报全文）
+- 影响范围与统计数字段落
+- 具体行动计划条目
+- 发布时间（HTML head 的 meta 标签）
 - 更新日期标记：`<meta property="article:modified_time" content="Mon, 25/05/2026 - 11:49" />`
 
 **WHO AFRO 提取注意事项**：
@@ -573,7 +569,7 @@ if idx < 0:
 
 ### 🚨 DuckDuckGo CAPTCHA 挑战（2026-05-26 新增）
 
-某些查询（尤其是中文、敏感主题如"Ebola"）会触发 DuckDuckGo 的 CAPTCHA 挑战——显示 "Select all squares containing a duck" 图片验证码，而非无结果空白页。
+某些查询（尤其是中文、敏感主题如疾病名/公共卫生事件）会触发 DuckDuckGo 的 CAPTCHA 挑战——显示 "Select all squares containing a duck" 图片验证码，而非无结果空白页。
 
 **识别特征**：返回的 HTML 中包含以下字符串：
 ```html
@@ -583,7 +579,7 @@ Select all squares containing a duck:
 
 **CAPTCHA 触发场景**（实测）：
 - 中文关键词 → 通常 OK
-- 英文关键词 + 敏感/健康话题 → 高概率触发（如 `Ebola DRC Uganda Bundibugyo 2026`）
+- 英文关键词 + 敏感/健康话题 → 高概率触发（如 `疾病名 + 国家名 + 年份` 形式）
 - 查询频率：第 1 次正常 → 第 2 次 CAPTCHA
 
 **对策**：一旦检测到 CAPTCHA HTML（含 "duck" / "challenge" / "squares" 等特征词），**立即放弃 DuckDuckGo** 并升级到下一层回退：Google News RSS 或 Wikipedia API。
