@@ -157,7 +157,7 @@ def cmd_stats(cur, cfg, a):
                       FROM {T} WHERE fetchdate BETWEEN %s AND %s""", (start, D))
 
     def blank():
-        return {"total": 0, "high": 0, "score_counts": {}, "null_score": 0, "out_of_range": 0,
+        return {"total": 0, "high": 0, "summary_line": 0, "score_counts": {}, "null_score": 0, "out_of_range": 0,
                 "regular": 0, "summary_candidates": 0, "summary_missing": 0, "summary_done": 0,
                 "official": 0, "content_empty": 0, "content_blank_only": 0, "sum_score": 0, "scored": 0,
                 "themes": defaultdict(int), "high_themes": defaultdict(int)}
@@ -195,6 +195,10 @@ def cmd_stats(cur, cfg, a):
         if r["score"] is not None and r["score"] >= hi:
             b["high"] += 1
             b["high_themes"][r["keyword"]] += 1
+        # 摘要生成线以上：与"高分"同口径（全量记录，含官网抓取）；
+        # 注意与流水线口径的 summary_candidates（剔除官网 + 正文非空）不是同一个数
+        if r["score"] is not None and r["score"] >= smin:
+            b["summary_line"] += 1
         b["themes"][r["keyword"]] += 1
 
     d = agg.get(D, blank())
@@ -203,6 +207,7 @@ def cmd_stats(cur, cfg, a):
     zero_dates = [x.isoformat() for x, b in zip(base_dates, base) if b["total"] == 0]
     avg_total = (sum(b["total"] for b in base) / valid_days) if valid_days else None
     avg_high = (sum(b["high"] for b in base) / valid_days) if valid_days else None
+    avg_sline = (sum(b["summary_line"] for b in base) / valid_days) if valid_days else None
     avg_score = (d["sum_score"] / d["scored"]) if d["scored"] else None
 
     dev = cfg["baseline"]["deviation_pct"] / 100.0
@@ -220,6 +225,7 @@ def cmd_stats(cur, cfg, a):
 
     total_cmp = compare(d["total"], avg_total, "总量")
     high_cmp = compare(d["high"], avg_high, "高分")
+    sline_cmp = compare(d["summary_line"], avg_sline, "摘要线以上")
 
     themes = []
     d_themes = {k: v for k, v in d["themes"].items()}
@@ -275,6 +281,7 @@ def cmd_stats(cur, cfg, a):
         "baseline_days": days, "baseline_dates": [x.isoformat() for x in base_dates],
         "baseline_valid_days": valid_days,
         "d": {"total": d["total"], "high": d["high"], "high_threshold": hi,
+              "summary_line": d["summary_line"], "summary_line_threshold": smin,
               "regular": d["regular"], "official": d["official"],
               "score_counts_nonnull": d["score_counts"], "null_score": d["null_score"],
               "out_of_range": d["out_of_range"], "avg_score_regular_excl_null": round(avg_score, 2) if avg_score is not None else None,
@@ -284,14 +291,15 @@ def cmd_stats(cur, cfg, a):
         "theme_breakdown": themes,
         "baseline_total_avg": round(avg_total, 1) if avg_total is not None else None,
         "baseline_high_avg": round(avg_high, 1) if avg_high is not None else None,
-        "compare_total": total_cmp, "compare_high": high_cmp,
+        "baseline_summary_line_avg": round(avg_sline, 1) if avg_sline is not None else None,
+        "compare_total": total_cmp, "compare_high": high_cmp, "compare_summary_line": sline_cmp,
         "flags": flags,
         "verdict_hint": "attention" if any(f["level"] == "attention" for f in flags) else "normal",
         "boundary": "仅为数据库记录口径，未核验服务器执行日志",
     }
-    lines = ["业务日期 %s | 共 %s 条（官网 %s）| 高分 %s | 基线日均 %s（%s 天）| 对比 %s%%"
+    lines = ["业务日期 %s | 共 %s 条（官网 %s）| 高分 %s（基线日均 %s）| 摘要线以上 %s（基线日均 %s）| 总量对比 %s%%"
              % (out["date"], d["total"], d["official"], d["high"],
-                out["baseline_total_avg"], valid_days,
+                out["baseline_high_avg"], d["summary_line"], out["baseline_summary_line_avg"],
                 total_cmp.get("delta_pct") if total_cmp.get("delta_pct") is not None else "NA"),
              "评分分布(普通来源,不含NULL):%s | NULL %s | 越界 %s | 均值 %s"
              % (d["score_counts"], d["null_score"], d["out_of_range"], out["d"]["avg_score_regular_excl_null"]),
