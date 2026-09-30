@@ -145,6 +145,10 @@ python3 -c "import json,os; data=json.load(open('feishu_movies.json')); assert d
   4. 第4层：近3年（如2024）遗漏高分片兜底 → 对照现有记录找未入库的年度爆款
 - **返回结构 GET≠POST**：GET 用 `code`==0，POST/DELETE 用 `"ok":true`。判定写错 → 已入库却报失败 → 重跑导致重复入库（2026-09-13 实测踩坑）。入库后一律重新 GET 核对总数
 - **lark-cli user token 丢失**：`lark-cli auth status` 显示 user identity missing（`~/.local/share/lark-cli/` 中无 user token 加密文件）时，所有 bitable GET/POST 均报 `token_missing`（错误码 need_user_authorization），且 bot 身份无 bitable scope（app_scope_not_applied）无法兜底。cron 下无法交互式 `lark-cli auth login`，**本周无法入库**——此时应如实报告阻塞原因，并附上已验证候选片单（含 subject ID）供授权恢复后直接入库。恢复方法：用户在终端运行 `lark-cli auth login --scope "bitable:app"`（或 `--domain bitable`）完成授权
+- **第三方站的「豆瓣评分」经常是假的，必须交叉验证（2026-09-27 实例）**：微光影视（veeup.cc）给《白天是阿波罗，晚上是雅典娜》标注「豆瓣 6.2」，而 subhd.top / 黑悟空 / 爱播影院 三家一致标 7.8（subhd 还带评价人数 1563）。若只信一家就会误判为「评分打架 → 跳过」而漏收一部 7.8 的片子。**可靠度排序：m.douban.com subject 快照（带「豆瓣评分：X」+「N人评价」）> subhd.top 等带评价人数的镜像 > 其他影视站标注的「豆瓣分」**；带评价人数的才是真快照，单有分数的可能被站点自己改过。同理影视站的「网友评分」「小编评分」一律不是豆瓣分。
+- **表内存在历史脏数据：7 组记录共用同一个豆瓣链接 subject ID**（30433456 / 35328542 / 36212583 / 36247731 / 36402947 / 36680492 / 36813121，每组两行，其中至少一行链接是错的）。后果：①**只按 subject ID 查重会误判**（两行不同片子共用 ID，新片可能撞上错 ID 而被误判为已收）→ 必须 **subject ID + 片名 双重比对**；②报告里不要引用这些行的链接。修复需逐个回查正确 subject，尚未做。
+- **授权到期后能自愈**：2026-09-20 因 refresh token 过期（10:00:12）整轮阻塞，写出的 `movies_pending_YYYYMMDD.json` 在 2026-09-27 授权自动刷新后原样入库成功（10 条全 OK）。所以 pending 文件是有效的跨周缓冲——**入库成功后立刻把 pending 文件改名 `.done`**（本次已改 `movies_pending_20260920.json.done`），否则下周会被重复入库。
+- **简介别照抄 pending 文件**：2026-09-20 那条《瘴气营地的青春性事与死亡》的简介写成了「少女被送进迷幻气雾笼罩的矫正营地」，与真实剧情（女导演翻拍砍杀片 + 戏中戏）完全不符——入库前用同一批搜索结果复核简介，错的就重写。
 - 其他细节参阅反例表
 
 ## 反例与黑名单
