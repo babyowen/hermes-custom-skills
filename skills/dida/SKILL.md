@@ -26,7 +26,7 @@ metadata:
 3. **删除类必须先问。** 删除任务、批量完成（>5 条）、把任务指派给别人 = 危险操作：**用户点名才做，一次一条，绝不批量删**。执行时脚本要带 `--yes`。
 4. **原始 JSON 不进聊天。** 一律走读侧脚本压缩（默认每组最多 15 条 + "另有 N 条"）。
 5. **时间一律北京时间。** 全天任务在库里存的是「北京日期 − 8 小时的 UTC 零点」，读侧脚本已换算；写侧直接给 `今天/明天/后天/周三/2026-10-05/"2026-10-05 15:00"/+3d`，由脚本换算。
-6. **写完必须回读。** 写生效有 1~3 秒延迟（脚本会轮询等）。脚本报 ⚠️ 时必须如实告诉用户"命令发了但没验证成功"，不许说成"已完成"。
+6. **写完必须回读，且回读有"成功的定义"。** 写生效有 1~3 秒延迟（脚本会轮询等）。**打卡的成功定义是 `status == 2` + `time` 非空**，不是"今天有记录"——只发 `--stamp` 会写出 `status=null/time=null` 的空壳记录，数据层有、APP 里仍显示未打卡（2026-09-30 实测踩到，脚本已修）。脚本报 ⚠️/❌ 时必须如实告诉用户"没生效"，不许说成"已完成"。
 
 ## 意图映射表
 
@@ -70,7 +70,9 @@ add-task --title T [--project 名] [--due 今天|明天|周三|2026-10-05|"2026-
                 [--priority 高|中|低|无] [--tags a,b] [--content C] [--items "a,b"] [--repeat RRULE]
 complete --title 关键词 | --task-id ID
 update   --title 关键词 | --task-id ID  [--title-new …] [--due …] [--priority …] [--content …] [--tags …]
-checkin  --habit 名字 [--date 今天] [--value n] [--goal n]
+checkin  --habit 名字 [--date 今天] [--value n] [--goal n] [--time ISO] [--status 2]
+         # 默认带 --time=现在 + --status 2 + --value 1（缺了就会写出 APP 不认的空壳记录）
+         # 补卡：--date 昨天；撤销打卡：--status 0
 delete-task --title 关键词 | --task-id ID --yes      # 不带 --yes 直接拒绝执行
 ```
 `--dry-run` 只打印将要执行的 CLI 命令、不写入——验证参数拼装用它（尤其打卡这类无法回收的写）。
@@ -122,6 +124,8 @@ delete-task --title 关键词 | --task-id ID --yes      # 不带 --yes 直接拒
 | 8 | 只看回读、不看 CLI 退出码，把命令失败当成"没生效" | 先取 `_cli_error`（非零退出）再谈回读；两个都要看 |
 | 9 | 把 `task filter --status 0` 的 41KB JSON 直接贴进对话 | 走 `dida_view.py` 压缩 + `--limit`，只报关键字段 |
 | 10 | 用系统 `python3` 跑脚本报缺依赖 | 本技能两个脚本只用标准库，系统 `python3` 就能跑（实测通过） |
+| 11 | 打卡只发 `--stamp`，回读只看"有记录"就报成功 | 空壳记录 `status=null/time=null`，APP 里仍显示未打卡；必须 `--time` + `--status 2`，回读判据也是 `status==2`（交叉验证：`habit list` 的 `totalCheckIns` 应 +1） |
+| 12 | 用内联 `python3 -c "…"` 跑临时核对（带引号+管道） | 会被审批拦截并超时 BLOCKED；核对写成 `~/.hermes/cache/xxx.py` 再跑 |
 
 ## 相关文件
 

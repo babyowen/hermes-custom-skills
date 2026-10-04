@@ -381,24 +381,43 @@ def cmd_update(a):
 def cmd_checkin(a):
     hid = resolve_habit(a.habit)
     d = parse_stamp(a.date)
-    args = ["habit", "checkin", hid, "--stamp", d.strftime("%Y%m%d")]
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # ⚠️ 只发 --stamp 会生成一条 time=null/status=null 的空壳记录：APP 里仍显示「未打卡」。
+    # 必须同时给 --time（打卡时刻）+ --status 2（已完成），字段才和软件端手打的一致。
+    args = ["habit", "checkin", hid, "--stamp", d.strftime("%Y%m%d"),
+            "--time", (a.time or now_utc), "--op-time", now_utc,
+            "--status", str(a.status if a.status is not None else 2)]
     if a.value is not None:
         args += ["--value", str(a.value)]
+    else:
+        args += ["--value", "1"]
     if a.goal is not None:
         args += ["--goal", str(a.goal)]
     if dry_out(args + ["--json"], a.json):
         return {"ok": True, "dry_run": True}
     res = run_cli(args + ["--json"], allow_fail=True)
-    # 回读：查当天记录（--to 排他，需 +1 天）
+    err = cli_err(res)
+    if err:
+        die("打卡失败：%s（习惯：%s）" % (err, a.habit))
+    # 回读：查当天记录（--to 排他，需 +1 天）；判定已完成必须看 status==2，不能只看「有记录」
     back = run_cli(["habit", "checkins", "--habits", hid, "--from", d.strftime("%Y%m%d"),
                     "--to", (d + timedelta(days=1)).strftime("%Y%m%d"), "--json"], allow_fail=True)
-    stamps = [str(c.get("stamp")) for grp in (back if isinstance(back, list) else [])
-              for c in (grp.get("checkins") or [])]
-    ok = d.strftime("%Y%m%d") in stamps
-    payload = {"ok": ok, "action": "checkin", "habit": a.habit, "habit_id": hid,
-               "date": d.isoformat(), "readback_verified": ok, "raw": res}
-    out(payload, a.json, ("✅ 已打卡：%s（%s，回读确认）" % (a.habit, d.isoformat())) if ok
-        else ("⚠️ 打卡命令已发，但回读没看到记录：%s（%s）" % (a.habit, d.isoformat())))
+    rec = None
+    for grp in (back if isinstance(back, list) else []):
+        for c in (grp.get("checkins") or []):
+            if str(c.get("stamp")) == d.strftime("%Y%m%d"):
+                rec = c
+    done = bool(rec) and rec.get("status") == 2
+    payload = {"ok": done, "action": "checkin", "habit": a.habit, "habit_id": hid,
+               "date": d.isoformat(), "record": rec, "readback_verified": done, "raw": res}
+    if done:
+        line = "✅ 已打卡：%s（%s，回读确认 status=2）" % (a.habit, d.isoformat())
+    elif rec:
+        line = ("❌ 打卡未生效：%s（%s）记录存在但 status=%s、time=%s —— APP 里仍会显示未打卡"
+                % (a.habit, d.isoformat(), rec.get("status"), rec.get("time")))
+    else:
+        line = "❌ 打卡未生效：%s（%s）回读没找到记录" % (a.habit, d.isoformat())
+    out(payload, a.json, line)
     return payload
 
 
@@ -476,6 +495,8 @@ def main():
     p.add_argument("--date")
     p.add_argument("--value", type=float)
     p.add_argument("--goal", type=float)
+    p.add_argument("--time", help="打卡时刻 ISO（默认现在；补卡时可指定）")
+    p.add_argument("--status", type=int, help="状态，默认 2=已完成（改 0 可撤销打卡）")
     p.set_defaults(func=cmd_checkin)
 
     p = sub.add_parser("delete-task", parents=[common])

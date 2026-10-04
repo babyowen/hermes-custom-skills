@@ -326,7 +326,11 @@ def checkins_between(from_d: date, to_d: date, habits: list[dict]) -> list[dict]
 
 def flatten_checkins(rows: list[dict]) -> dict:
     """真实结构是嵌套的：[{id, habitId, year, checkins:[{id, stamp, time, value, goal, status}]}]
-    → {(habitId, 'YYYYMMDD'): {'value': v, 'time': t}}"""
+    → {(habitId, 'YYYYMMDD'): {'value': v, 'time': t, 'status': s}}
+
+    ⚠️ 判定「已打卡」必须看 **status == 2**：只发 --stamp 写出来的记录 status/time 都是 null，
+    数据层有记录但 APP 里显示未打卡（2026-09-30 实测踩到）。
+    """
     hits = {}
     for grp in rows:
         hid = str(grp.get("habitId") or grp.get("habit_id") or "")
@@ -334,8 +338,13 @@ def flatten_checkins(rows: list[dict]) -> dict:
             stamp = c.get("stamp")
             if hid and stamp:
                 hits[(hid, str(stamp))] = {"value": c.get("value"), "time": c.get("time"),
-                                            "goal": c.get("goal")}
+                                            "goal": c.get("goal"), "status": c.get("status")}
     return hits
+
+
+def is_done(rec: dict | None) -> bool:
+    """APP 口径：status == 2 才算完成。"""
+    return bool(rec) and rec.get("status") == 2
 
 
 def cmd_checkins(a):
@@ -349,18 +358,23 @@ def cmd_checkins(a):
         st = d0.strftime("%Y%m%d")
         rec = hits.get((hid, st))
         _t = to_cst((rec or {}).get("time")) if rec else None
+        done = is_done(rec)
         items.append({"habit": h.get("name"), "id": hid, "goal": h.get("goal"),
-                      "done": rec is not None, "value": (rec or {}).get("value"),
+                      "done": done, "record_exists": rec is not None,
+                      "status": (rec or {}).get("status"), "value": (rec or {}).get("value"),
                       "time_local": _t.strftime("%H:%M") if _t else None,
-                      "days_hit_in_range": sum(1 for (x, _s) in hits if x == hid)})
+                      "days_hit_in_range": sum(1 for (x, _s), r in hits.items()
+                                               if x == hid and is_done(r))})
     payload = {"ok": True, "from": d0.isoformat(), "to": d1.isoformat(), "days": a.days,
                "habits": items, "done_count": sum(1 for i in items if i["done"]), "total": len(items)}
     L = ["🔁 **习惯打卡 | %s**（已打卡 %d/%d）" % (d0.isoformat(), payload["done_count"], payload["total"])]
     for i in items:
-        mark = "✅" if i["done"] else "⬜"
+        mark = "✅" if i["done"] else ("⚠️" if i["record_exists"] else "⬜")
         extra = ""
         if i["done"] and i["time_local"]:
             extra = "（%s 打的）" % i["time_local"]
+        elif i["record_exists"] and not i["done"]:
+            extra = "（有记录但 status=%s，APP 里算未打卡）" % i["status"]
         elif a.days > 1:
             extra = "（区间内 %d 天有记录）" % i["days_hit_in_range"]
         L.append("- %s %s%s" % (mark, i["habit"], extra))
@@ -408,9 +422,9 @@ def cmd_brief(a):
     nodate = sort_tasks([r for r in rows if not r["due_date"]])
     soon = sort_tasks([r for r in rows if r["due_date"] and today < date.fromisoformat(r["due_date"]) <= today + timedelta(days=3)])
     habits = fetch_habits()
-    ci = checkins_between(today, today, habits)
-    done_today = {str(r.get("habitId") or r.get("habit_id") or "") for r in ci}
-    habit_state = [{"habit": h.get("name"), "done": str(h.get("id")) in done_today} for h in habits]
+    hits = flatten_checkins(checkins_between(today, today, habits))
+    habit_state = [{"habit": h.get("name"), "done": is_done(hits.get((str(h.get("id")), today.strftime("%Y%m%d"))))}
+                   for h in habits]
     if a.mode == "morning":
         # 建议尽早办：逾期 > 今天到期且高优先级 > 今天到期 > 3 天内高优先级
         urgent = []
