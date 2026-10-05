@@ -43,21 +43,16 @@
 - 同日重复检查且结论有变化时，第一行末尾加 `🔁 更新`。
 - 不发送大段全文、整库数据、口令。
 
-**发送**
-```bash
-lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
-  --markdown "$(cat /tmp/serp_report_<D>.md)" \
-  --idempotency-key "serp-news-check-<D>"
-```
-核对返回的 `ok:true` 与 `message_id`（`om_...`）后才说「已通知」；发送状态不明时不盲目重发（同一 `--idempotency-key` 可防重复）。
+**投递**
+简报正文就是 agent 的**最终回复**，由系统按 job 的 `deliver` 投递**一次**。**不要调 lark-cli 推送**（会与系统投递重复，用户收到两条一致的消息）；也不要写「已推送/已通知/message_id」。
 
 ## 状态文件（去重）
 `~/.hermes/cache/serp-news-monitor/<业务日期>.json`
 ```json
-{"sent": true, "msg_id": "om_xxx", "verdict": "关注",
+{"sent": true, "verdict": "关注",
  "sample_ids": [143523, 143627], "extended_ids": [143636], "updated_at": "…"}
 ```
-`msg_id` 只存最新一次发出的回执（旧回执放 `msg_id_history`），复跑时照它报回执，别引用历史 ID。
+投递没有回执，**不再写 `msg_id`**（旧状态文件里的 `msg_id`/`msg_id_history` 保留不动，仅作历史）；同日复跑靠 `verdict` + 抽样 ID 判别。
 
 ## 实例（2026-09-18 实跑）
 ```text

@@ -11,7 +11,7 @@ metadata:
 # serp_news 轻量日巡检
 
 ## 概述
-只读检查 `serp_news.scored_news` 前一天的产出：数量是否正常、评分/摘要有无明显问题、烟草官网当日有没有抓取记录（只看库内有无），最后用 lark-cli 发中文简报。方式是「一轮聚合 ＋ 少量随机抽检」：正常就快速结束，异常才做少量补查。**不要把自己变成第二个采集/评分流水线。**
+只读检查 `serp_news.scored_news` 前一天的产出：数量是否正常、评分/摘要有无明显问题、烟草官网当日有没有抓取记录（只看库内有无），最后把中文简报作为**最终回复**输出（系统按 job 的 deliver 投递一次）。方式是「一轮聚合 ＋ 少量随机抽检」：正常就快速结束，异常才做少量补查。**不要把自己变成第二个采集/评分流水线。**
 
 结论口径是「当日业务产出正常/需关注」，不是「服务器任务执行成功」——没有日志，无法验证执行。
 
@@ -47,14 +47,10 @@ metadata:
 - **不去访问官网页面**、不做「疑似漏采」推断、不推断上海任务是否成功（官网对本机反爬／不可达，且用户 2026-09-19 明确只看库内有无）。
 - 官网来源固定 4 分、可能不过摘要阶段 → 不纳入模型抽检与默认摘要缺失率；量少（0–4 条/天）属常态。
 
-⑥ **发飞书简报**（正常也发；连接失败发「监测受阻」）
-```bash
-export FEISHU_HOME_CHANNEL=$(grep '^FEISHU_HOME_CHANNEL=' ~/.hermes/.env | cut -d= -f2-)
-lark-cli im +messages-send --chat-id "$FEISHU_HOME_CHANNEL" --as bot \
-  --markdown "$(cat /tmp/serp_report_<D>.md)" --idempotency-key "serp-news-check-<D>"
-```
-用 `--as bot`、发到用户本人收件目标，不重配渠道。核对返回 `ok:true` ＋ `message_id` 才算「已通知」；状态不明不盲目重发（同 key 防重）。
-cron 环境里 `$FEISHU_HOME_CHANNEL` 可能未导出（2026-09-21 实测为空），先从 `~/.hermes/.env` 提取再用。简报超 400 字时用 `lark-cli im +messages-edit --as bot --message-id <om_> --markdown …` **原地压缩**（模板要求行数多，10 行全文约 450–530 字属正常），不要发第二条。
+⑥ **输出简报 = 你的最终回复**（正常也出；连接失败出「监测受阻」）
+- **把简报正文直接作为最终回复输出**，由系统按 job 的 `deliver` 投递**一次**。**不要调 `lark-cli` 自己推送**——系统还会把你最终回复再投递一遍，用户会收到两条一模一样的消息（2026-10-05 修正）。
+- **不写「已推送/已通知/message_id」这类元信息**（用户明令禁止）；正文写完即结束。
+- 版式/字数要改就直接改正文重发；不必为了 400 字去「原地编辑」（那一套已废弃）。
 
 **版式：图标化＋扫读优先（硬要求）**，200–400 字、≤15 行，结论与待办在前 3 行：
 - 首行 `【serp_news 日巡检｜业务日期 YYYY-MM-DD】` ＋ 状态图标：🟢正常 / 🟡关注 / 🔴异常 / ⛔受阻。
@@ -63,8 +59,8 @@ cron 环境里 `$FEISHU_HOME_CHANNEL` 可能未导出（2026-09-21 实测为空�
 - 正常项一行带过；异常项写「什么＋多少＋建议动作＋记录 ID」，并给依据（如同星期对比），不做因果猜测。
 - 完整图标字典、模板与实例：`references/report-template.md`。
 
-⑦ **落状态**（同日重复执行去重、留抽样 ID 与回执）：`state --date <D> --merge '{"sent":true,"msg_id":"om_xxx","sample_ids":[...],"extended_ids":[...]}'`，读回用 `state --date <D>`。文件在 `~/.hermes/cache/serp-news-monitor/<D>.json`。
-- `msg_id` **只保留最新一次真正发出的回执**；旧回执放进 `msg_id_history` 数组。复跑报回执时以 `state` 读到的 `msg_id` 为准，**不要**引用历史 ID（2026-09-19 复跑时就误报了上一版回执）。
+⑦ **落状态**（同日重复执行去重、留抽样 ID）：`state --date <D> --merge '{"sent":true,"sample_ids":[...],"extended_ids":[...]}'`，读回用 `state --date <D>`。文件在 `~/.hermes/cache/serp-news-monitor/<D>.json`。
+- 投递由系统完成、**没有回执**，所以不再写 `msg_id`（旧状态文件里的 `msg_id`/`msg_id_history` 保留不动，仅作历史）；同日复跑靠「业务日期 + 结论档位 + 抽样 ID」判别。
 - 重复检查有新发现时简报标 🔁 更新；绝不在状态文件里存密码；绝不改生产数据。
 
 ## 结论四档
@@ -97,8 +93,8 @@ cron 环境里 `$FEISHU_HOME_CHANNEL` 可能未导出（2026-09-21 实测为空�
 | 公积金 region 为空判错 | 地域无法可靠判断时可空，不算错 |
 | 主题/阈值写死在脚本 | 改 `scripts/config.json` |
 | 子命令报 `unrecognized arguments: --json` | `--json` 为全局参数，写子命令前：`--json stats --date D` |
-| cron 里 `$FEISHU_HOME_CHANNEL` 为空 | `export $(grep '^FEISHU_HOME_CHANNEL=' ~/.hermes/.env)` 后再发 |
-| 简报超长／版式要改 | 同一条消息 `im +messages-edit` 原地改，别重发（同 key 去重、新 key 会刷屏） |
+| 收到两条一样的简报 | 曾经「lark-cli 自推送 ＋ 系统投递」双重投递（2026-10-05 已删自推送）；规则：**简报正文=最终回复**，不调 lark-cli |
+| 简报超长／版式要改 | 改正文重发（投递由系统负责，无「原地编辑」这回事） |
 
 - 详细口径与边界：`references/check-rules.md` ｜ 字段与库结构：`references/db-schema.md`
 - 简报模板与实例：`references/report-template.md` ｜ 运行参数：`scripts/config.json`
