@@ -5,14 +5,14 @@ description: "智能追踪全网热点，自动分析热点趋势、跨平台关
 
 # HotList Analyzer 智能热点追踪分析技能 V2
 
-> ⚠️ hotlist 模块永久缺失，所有 Python 脚本不可用。交互模式用 `execute_code` + `httpx` 实时采集。
-> ⚠️ **Cron模式限制**：`execute_code` 在 cron 模式下被完全阻止。须用 `curl -s --max-time 15` 逐平台采集 JSON 到 `/tmp/`，再用 `python3 -c` 或独立 `.py` 脚本通过 `terminal()` 解析。详见坑点#8。
+> ⚠️ hotlist 旧模块（目录下的 analyzer.py / cli.py 等）依赖永久缺失，不可用。**采集一律走 `scripts/hot_collect.py`**（纯标准库，cron 与交互通用；交互模式下不必再用 execute_code + httpx）。
+> ⚠️ **Cron模式限制**：`execute_code` 在 cron 模式下被完全阻止 → 用 `python3 ~/.hermes/skills/hotlist-analyzer/scripts/hot_collect.py` 一次完成 8 平台采集与解析。详见坑点#8。
 
 ## Cron 执行流程
 
 | 步骤 | 操作 | 说明 | ⚠️ 失败降级 |
 |:----:|:----|:----|:-----------|
-| 1 | 采集8平台 | 交互模式：httpx并行；cron模式：curl逐平台。API: `https://hot-api.vhan.eu.org/v2?type={key}`，`d['data']`是列表。注意 `hot` 值可能是字符串（如 `"5098.1万"`）而非数值 | 某平台超时→重试1次→仍失败则跳过→**⚠️降级运行**标注。douyinHot间歇性报 `error code: 1101`（服务端错误），出错才跳过 |
+| 1 | 采集8平台 | **直接跑技能自带脚本**：`python3 ~/.hermes/skills/hotlist-analyzer/scripts/hot_collect.py`（一次调用完成 8 平台采集+解析，逐平台打印 TOP20）；可选 `--json` / `--top 30` / `--timeout 20` / `--platforms …`；原始快照自动落 `~/.hermes/cache/hotlist/raw_<时间戳>.json`。API 与字段名维护在脚本内（`hot` 可能是字符串如 `"5098.1万"`，脚本已统一转 str） | 脚本退出码：**0=全正常 ｜ 2=部分平台失败→报告标 ⚠️ 降级运行 ｜ 1=全部失败**。douyinHot 间歇性报 `error code: 1101`（服务端错误），出错才跳过 |
 | 2 | **聚类筛选** | ① **按事件/实体聚类**：同一事件的多平台/多角度报道合成一条**主线**（取最权威链接为主链，其余作**支线**＝一句话+链接）；② 排序：跨平台出现次数 → 热度值 → 与近 48h 已报不重复；③ **时效核验**：事件日期 >48h 或无法确认（旧文再流传）**不进主区**，最多降级到快讯区；④ 产出 **主区 4-5 条 + ⚡快讯 6-8 条** | 数据不足时仅按热度排，主区最少 2 条 |
 | 🔴 | **交互模式确认** | **展示筛选结果给用户，确认后再进深度分析** | **Cron模式自动跳过此步** |
 | 3 | 深度分析 | 主区每条 **250-400 字（硬上限 400）**（主题簇：主线 ≤400 字 + 每支线 1 句）；**⚡快讯区零抓取** —— 直接用榜单标题+摘要字段+链接，每条 ≤60 字。搜索链路: web_search→web_extract→browser降级 | web_search失败→web_extract→browser→仍不行则基于已有摘要分析，标注⚠️ |
@@ -73,12 +73,12 @@ description: "智能追踪全网热点，自动分析热点趋势、跨平台关
 | 5 | 切换替代方案不告知用户 | 报告中标注 **⚠️ 降级运行** + 原因 |
 | 6 | 报告超2000字 | 严格控制在≤2000字 |
 | 7 | `--as user` 发飞书缺scope | 降级 `--as bot`，无需重新auth |
-| 8 | cron模式下用 `execute_code` 采集 | **execute_code被cron模式阻止**。改用 `curl -s --max-time 15 "https://hot-api.vhan.eu.org/v2?type={key}" -o /tmp/hot_{key}.json` 逐平台采集，再 `python3 -c` 或独立 `.py` 脚本文件解析 |
-| 9 | `xargs -n1 -P8 -I{}` 并行curl；终端前台用 `&` 后台 | xargs 的 `-I{}` 会把**整行**当参数替换导致URL拼接错乱（-n1 与 -I 互斥被忽略）；终端前台禁 `&`。**最优解：write_file 写一个自包含 `.py`（urllib + 15s超时 + 失败重试1次，逐平台拉取→解析→打印TOP），terminal 单次执行 `python3 /tmp/x.py`**——采集与解析原子完成，避免跨 terminal 调用交接 /tmp 文件（沙箱 /tmp 可能在调用间被清空，glob 返回空） |
+| 8 | cron模式下用 `execute_code` 采集 | **execute_code被cron模式阻止**。改用技能自带脚本 `python3 ~/.hermes/skills/hotlist-analyzer/scripts/hot_collect.py`（纯标准库 urllib，8 平台一次性采集+解析），不要再走 `curl -o /tmp/hot_{key}.json` 逐平台拼装 |
+| 9 | `xargs -n1 -P8 -I{}` 并行curl；终端前台用 `&` 后台 | xargs 的 `-I{}` 会把**整行**当参数替换导致URL拼接错乱（-n1 与 -I 互斥被忽略）；终端前台禁 `&`。**正解：直接用技能自带 `scripts/hot_collect.py`**（内置 15s 超时 + 失败重试 1 次 + 逐平台容错），**不要再让 LLM 现写一次性 `.py` 到 /tmp** —— 那是文件名撞车 / 旧文件写保护 / 跨 terminal 交接丢文件的根源（见坑点#13） |
 | 10 | 榜单里混进**旧文再流传**（2026-09-29 实例：虎嗅"微信将上线AI助手"实为 6/3 旧文） | Step 2 加**时效核验**：事件日期 >48h 或无法确认 → 不进主区（最多降级到快讯区）；必要时报告末尾加一行纠偏 |
 | 11 | 早晚两期报同一件事 | 用 `scripts/hotlist_dedupe.py --check` 过滤候选、报告发出后 `--mark` 登记（48h 窗口）；脚本失败不阻塞出报 |
 | 12 | ⚡快讯区被写成"第二份报告" | 快讯每条**严格 ≤60 字、一行**：`标题 — 一句为什么 [链接]`；不做抓取、不写要点 |
-| 13 | `write_file` 写 `/tmp/hot_collect.py` 被"陈旧写保护"拒绝（上次运行的残留文件未读过） | 采集脚本用**带时间戳的唯一文件名** `write_file /tmp/hot_collect_<HHMMSS>.py`（或先 `read_file` 再覆盖）。2026-09-29 实测：固定名会被拒，虽不阻塞采集但留 ⚠️ 噪音 |
+| 13 | `write_file` 写**已存在且本次未读过**的文件被拒 → 报文尾部多一段 ⚠️ File-mutation verifier 噪音 | 这是 Hermes 的**陈旧写保护**（防误盖不了解内容的旧文件），不是崩溃、不阻塞出报。2026-10-06 实例：采集脚本名 `/tmp/hot_collect_100500.py` 撞上 10-03 的残留 → 写盘失败 + 一次无效重试。**根治：采集不再写临时文件**（用 `scripts/hot_collect.py`）；其余跨运行复用的数据文件一律带时间戳（`/tmp/hot_cand_<YYYYMMDD_HHMM>.json`、`/tmp/hot_report_<YYYYMMDD>.txt`、`/tmp/hot_reported_<YYYYMMDD>.json`），或先 `read_file` 再覆盖 |
 
 ---
 
