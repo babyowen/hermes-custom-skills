@@ -244,6 +244,26 @@ def cmd_stats(cur, cfg, a):
             t["status"] = "主题突然归零，需关注"
         themes.append(t)
 
+    # 主题覆盖（2026-10-05 用户要求：要点名「哪个主题没产出」，不能只给 7/8）
+    known_themes = list(cfg["themes"])
+    covered = [k for k in known_themes if d_themes.get(k, 0) > 0]
+    missing_themes = [k for k in known_themes if d_themes.get(k, 0) == 0]
+    theme_cov = {
+        "known_total": len(known_themes),
+        "covered_n": len(covered),
+        "covered": covered,
+        "missing_n": len(missing_themes),
+        "missing": missing_themes,
+        # 缺失主题的基线情况：区分「本来就不常出」和「突然归零」
+        "missing_detail": [
+            {"theme": k,
+             "baseline_avg": round(sum(b["themes"].get(k, 0) for b in base) / valid_days, 1) if valid_days else None,
+             "baseline_days_with_data": sum(1 for b in base if b["themes"].get(k, 0) > 0)}
+            for k in missing_themes],
+        # 库里出现但不在 config.themes 里的主题（如 2026-10-02 起冒出的「江苏机关事务」）
+        "extra_unknown": sorted(k for k, v in d_themes.items() if k not in known_themes and v > 0),
+    }
+
     flags = []
     if d["total"] == 0:
         flags.append({"code": "no_data_today", "level": "attention",
@@ -275,6 +295,17 @@ def cmd_stats(cur, cfg, a):
     if d["official"] == 0:
         flags.append({"code": "official_none_today", "level": "info",
                       "msg": "当日无官网抓取记录（官网可能当天没有新闻，不单独告警）"})
+    # 点名缺失主题（基线本来就常缺的写 info，突然归零的写 attention）
+    for m in theme_cov["missing_detail"]:
+        bavg = m["baseline_avg"] or 0
+        flags.append({"code": "theme_missing",
+                      "level": "attention" if bavg >= 1 else "info",
+                      "msg": "主题[%s] 当日 0 条（基线日均 %.1f 条，基线 %d 天有数据）"
+                             % (m["theme"], bavg, m["baseline_days_with_data"])})
+    if theme_cov["extra_unknown"]:
+        flags.append({"code": "theme_unknown", "level": "info",
+                      "msg": "出现 config.themes 之外的选题: %s（建议确认是否新增主题、是否要加进 config.json）"
+                             % "、".join(theme_cov["extra_unknown"])})
 
     out = {
         "ok": True, "date": D.isoformat(), "generated_at": datetime.now(CST).isoformat(timespec="seconds"),
@@ -289,6 +320,7 @@ def cmd_stats(cur, cfg, a):
               "summary_missing": d["summary_missing"],
               "content_empty_string_or_null": d["content_empty"], "content_blank_only": d["content_blank_only"]},
         "theme_breakdown": themes,
+        "themes": theme_cov,
         "baseline_total_avg": round(avg_total, 1) if avg_total is not None else None,
         "baseline_high_avg": round(avg_high, 1) if avg_high is not None else None,
         "baseline_summary_line_avg": round(avg_sline, 1) if avg_sline is not None else None,
@@ -306,6 +338,15 @@ def cmd_stats(cur, cfg, a):
              "摘要候选 %s / 完成 %s / 缺失 %s | 空正文 %s 条、纯空白 %s 条"
              % (d["summary_candidates"], d["summary_done"], d["summary_missing"],
                 d["content_empty"], d["content_blank_only"])]
+    cov_line = "主题覆盖 %d/%d 有产出" % (theme_cov["covered_n"], theme_cov["known_total"])
+    if theme_cov["missing_detail"]:
+        cov_line += " | ➖ 未产出: " + "、".join(
+            "%s（基线日均 %.1f 条）" % (m["theme"], m["baseline_avg"] or 0) for m in theme_cov["missing_detail"])
+    else:
+        cov_line += " | 全部有产出"
+    if theme_cov["extra_unknown"]:
+        cov_line += " | 🆕 配置外主题: " + "、".join(theme_cov["extra_unknown"])
+    lines.append(cov_line)
     for t in themes[:12]:
         lines.append("  主题 %-8s 当日 %4d | 基线日均 %s | 状态 %s" %
                      (t["label"], t["current"], t["baseline_avg"], t["status"]))

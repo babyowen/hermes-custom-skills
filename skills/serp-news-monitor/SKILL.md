@@ -27,7 +27,7 @@ metadata:
 （该 venv 只为 pymysql 而建；Hermes 自带 python 没装 pymysql，别换解释器）
 
 ① **聚合统计**（一次查询覆盖 D 与之前 7 天）：`--json stats --date <D>`（D 默认北京时间昨天；`--json` 是**全局参数，必须写在子命令前**，否则报 `unrecognized arguments: --json`）
-看 `compare_total/compare_high/theme_breakdown/flags`。退出码：0 正常、2 有风险提示、1 执行失败。
+看 `compare_total/compare_high/theme_breakdown/flags`，**以及 `themes`（主题覆盖：`covered` / `missing` / `missing_detail` / `extra_unknown`）**。退出码：0 正常、2 有风险提示、1 执行失败。
 
 ② **数量判断**：以 `baseline_total_avg` 为基线（有效天数看 `baseline_valid_days`）。偏离 >40% 且绝对差 ≥10 条才算线索。`baseline_zero_record_days` 是零记录日期（≠未知缺失，别当正常零产出，也别无声剔除）。有效样本 <3 天写「基线不足」；基线为 0 不计算百分比。
 
@@ -54,7 +54,7 @@ metadata:
 
 **版式：图标化＋扫读优先（硬要求）**，200–400 字、≤15 行，结论与待办在前 3 行：
 - 首行 `【serp_news 日巡检｜业务日期 YYYY-MM-DD】` ＋ 状态图标：🟢正常 / 🟡关注 / 🔴异常 / ⛔受阻。
-- 固定标签行：📊数据 ｜ 🏷️主题 ｜ 🤖模型 ｜ 🔍抽检 ｜ 🌐官网 ｜ 📌需处理（无则整行省略）＋ 🧭边界。
+- 固定标签行：📊数据 ｜ 🏷️主题（**K/8 有产出 ＋ 点名未产出的主题**）｜ 🤖模型 ｜ 🔍抽检 ｜ 🌐官网 ｜ 📌需处理（无则整行省略）＋ 🧭边界。
 - 图标只表状态不装饰：✅通过 ⚠️待核 ❌已确认问题 ❔不可判断 📈/📉/➖ 高/低于/持平基线 🔁同日更新。
 - 正常项一行带过；异常项写「什么＋多少＋建议动作＋记录 ID」，并给依据（如同星期对比），不做因果猜测。
 - 完整图标字典、模板与实例：`references/report-template.md`。
@@ -93,7 +93,8 @@ metadata:
 | 公积金 region 为空判错 | 地域无法可靠判断时可空，不算错 |
 | 主题/阈值写死在脚本 | 改 `scripts/config.json` |
 | 子命令报 `unrecognized arguments: --json` | `--json` 为全局参数，写子命令前：`--json stats --date D` |
-| 收到两条一样的简报 | 曾经「lark-cli 自推送 ＋ 系统投递」双重投递（2026-10-05 已删自推送）；规则：**简报正文=最终回复**，不调 lark-cli |
+| 只写「主题 7/8 有产出」不点名 | 用户 2026-10-05 明确要求：**要点出是哪个主题没产出**。用 `stats.themes.missing` / `missing_detail`（缺失主题名 + 基线日均）逐个写出；基线本来就低产的标「长期低产」，突然归零的标 ⚠️。主持别用 8 减自己算，分母是 `themes.known_total` |
+| 库里冒出 config 里没有的主题（如「江苏机关事务」） | `themes.extra_unknown` 会列出来；简报写 🆕 并提醒是否加进 `config.json` 的 `themes`（别默默当已知主题报） |
 | 简报超长／版式要改 | 改正文重发（投递由系统负责，无「原地编辑」这回事） |
 
 - 详细口径与边界：`references/check-rules.md` ｜ 字段与库结构：`references/db-schema.md`
