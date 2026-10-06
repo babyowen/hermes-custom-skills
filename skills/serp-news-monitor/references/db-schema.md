@@ -13,7 +13,7 @@
 | fetchdate | date | **统计口径字段**（业务日期） |
 | sourceapi | varchar(255) | 采集通道：`serp_googlenews` / `serp_bingnews` / `serp_baidunews` / `serp_duckduckgo_news` / `官网抓取`；可能为 NULL |
 | thumbnail | text | 缩略图 |
-| keyword | varchar(255) | 主题（养老/公积金/烟草服务银行/政府基金/中国烟草/机关事务/零基预算/数字政务） |
+| keyword | varchar(255) | 主题（养老/公积金/烟草服务银行/政府基金/中国烟草/江苏机关事务/零基预算/数字政务） |
 | content | longtext | 正文 |
 | wordcount | int | 字数（实测 = `CHAR_LENGTH(content)`，仍以 CHAR_LENGTH 为准） |
 | custom_grab | tinyint(1) | 自定义抓取标记 |

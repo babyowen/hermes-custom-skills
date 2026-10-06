@@ -94,7 +94,7 @@ metadata:
 | 主题/阈值写死在脚本 | 改 `scripts/config.json` |
 | 子命令报 `unrecognized arguments: --json` | `--json` 为全局参数，写子命令前：`--json stats --date D` |
 | 只写「主题 7/8 有产出」不点名 | 用户 2026-10-05 明确要求：**要点出是哪个主题没产出**。用 `stats.themes.missing` / `missing_detail`（缺失主题名 + 基线日均）逐个写出；基线本来就低产的标「长期低产」，突然归零的标 ⚠️。主持别用 8 减自己算，分母是 `themes.known_total` |
-| 库里冒出 config 里没有的主题（如「江苏机关事务」） | `themes.extra_unknown` 会列出来；简报写 🆕 并提醒是否加进 `config.json` 的 `themes`（别默默当已知主题报） |
+| 库里冒出 config 里没有的主题 | `themes.extra_unknown` 会列出来；简报写 🆕 并提醒是否加进 `config.json` 的 `themes`（别默默当已知主题报）。**主题名必须逐字一致**：名字对不上会同时报「配置外主题」+「某主题未产出」，2026-10-05 就因 config 里写「机关事务」而库里是「江苏机关事务」白报了几天 |
 | 简报超长／版式要改 | 改正文重发（投递由系统负责，无「原地编辑」这回事） |
 
 - 详细口径与边界：`references/check-rules.md` ｜ 字段与库结构：`references/db-schema.md`
