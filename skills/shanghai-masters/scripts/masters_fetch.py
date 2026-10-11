@@ -88,6 +88,15 @@ ROTATE_GROUPS = ["讨论热点", "吃饭餐饮", "观赛周边", "赛况赔率"]
 SOCIAL_DDG_CORE = ["上海劳力士大师赛 停车"]
 SOCIAL_DDG_ROTATE = ["上海大师赛 观赛 体验", "旗忠网球中心 攻略", "上海大师赛 带什么 现场", "上海大师赛 决赛"]
 DDG_BACKOFF = 20.0        # DDG 返回 202/空结果时的退避秒数（实测连续查询会被限流）
+# DDG 实测预算（2026-10-11）：从本机**约 1 次查询/冷却期**——单发成功、紧接着连打 4 条全 202。
+# 所以每期只发 **1 条** DDG 查询，按日期轮换目标；失败即整体跳过（fail fast，别加深冷却）。
+# 格式：(分组, 查询词, 抓取器名)
+DDG_TARGETS = [
+    ("停车自驾", "上海大师赛 停车 自驾 攻略", "media"),
+    ("带物安检", "上海大师赛 限带物品 清单 水杯", "media"),
+    ("讨论热点", "上海劳力士大师赛 停车", "weibo"),
+    ("讨论热点", "上海大师赛 观赛 体验", "xhs"),
+]
 
 OFFICIAL_PAGES = {
     "transport": "https://en.rolexshanghaimasters.com/en/tournament/transportation-information",
@@ -353,29 +362,69 @@ def fetch_media(kw: str, limit: int = 6) -> list[dict]:
     return items or [{"_error": e} for e in errs[:1]]
 
 
+def weibo_body_from_md(md: str) -> str:
+    """从 scrapling 抓的微博页 markdown 里提正文（真浏览器路线，2026-10-11 实测可用）。"""
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in md.splitlines()]
+    skip = ("微博正文", "微博", "关注", "转发", "评论", "赞", "展开", "收起", "来自",
+            "首页", "视频", "超话", "登录", "注册", "更多", "投诉", "举报")
+    body = []
+    for ln in lines:
+        if not ln or ln.startswith(("#", "[!", "[", "!", "|", ">", "*", "-", "http")):
+            continue
+        if any(ln.startswith(s) for s in skip) or len(ln) < 18:
+            continue
+        if ln in body:
+            continue
+        body.append(ln)
+        if len("".join(body)) > 400:
+            break
+    txt = " ".join(body)
+    txt = re.sub(r"\[!\[[^\]]*\]\([^)]*\)", "", txt)          # [![](img)](link)
+    txt = re.sub(r"\[([^\]]{0,40})\]\([^)]*\)", r"\1", txt)   # [文字](链接) → 文字
+    txt = re.sub(r"https?://\S+", "", txt)
+    return re.sub(r"\s+", " ", txt).strip()[:400]
+
+
+def weibo_body(url: str) -> dict:
+    """取单条微博正文：先 plain HTTP（快），被 Sina Visitor System 拦了就降级 scrapling 真浏览器。
+    实测（2026-10-11）：www.weibo.com/detail/<id> 与 m.weibo.cn/detail/<id> 用 urllib 一律返回
+    「Sina Visitor System」登录墙（~9KB）；scrapling stealthy-fetch 能拿到正文（8.3KB markdown）。"""
+    out = {"url": url, "tier": "", "body": "", "error": None}
+    try:
+        html = http_get(url, referer="https://weibo.com/", timeout=20)
+        m = (re.search(r'property="og:description" content="([^"]{20,800})"', html)
+             or re.search(r'<meta name="description" content="([^"]{20,800})"', html))
+        body = unesc(m.group(1)) if m else ""
+        if len(body) >= 20 and "Visitor System" not in html:
+            out.update(tier="urllib", body=body[:400])
+            return out
+    except Exception as e:  # noqa: BLE001
+        out["error"] = "urllib: %s" % e
+    md = scrapling_fetch(url, os.path.join(CACHE, "weibo_tmp.md"))
+    if md:
+        body = weibo_body_from_md(md)
+        if len(body) >= 20:
+            out.update(tier="scrapling", body=body, error=None)
+            return out
+    out["error"] = out["error"] or "微博正文提取失败（登录墙 + scrapling 也未拿到）"
+    return out
+
+
 def fetch_weibo(kw: str, limit: int = 4) -> list[dict]:
-    """微博：DDG 找站内帖 → 抓正文。实测 www.weibo.com/<uid>/detail/<id> 页面可直读，
-    正文在 og:description（2026-10-11 实测 58KB、无登录墙）。"""
+    """微博：DDG 找站内帖 → 抓正文（urllib 被登录墙拦时自动降级 scrapling，见 weibo_body）。"""
     hits, errs = ddg_search("site:weibo.com " + kw, limit=limit * 3, host_filter="weibo.com")
     out = []
     for it in hits:
         if not re.search(r"(?:detail|status)/\d+", it["url"]):
             continue
-        try:
-            html = http_get(it["url"], referer="https://weibo.com/", timeout=20)
-        except Exception as e:  # noqa: BLE001
-            errs.append("weibo: 抓取失败 %s" % e)
+        r = weibo_body(it["url"])
+        if not r.get("body"):
+            errs.append("weibo: 未取到正文（%s）" % it["url"][-16:])
             continue
-        m = (re.search(r'property="og:description" content="([^"]{20,800})"', html)
-             or re.search(r'<meta name="description" content="([^"]{20,800})"', html))
-        body = unesc(m.group(1)) if m else ""
-        if len(body) < 20:
-            errs.append("weibo: 帖子无正文（%s）" % it["url"][-16:])
-            continue
-        out.append(dict(it, source="微博", snippet=body[:300], url_note="微博帖（正文已抓取）"))
+        out.append(dict(it, source="微博", snippet=r["body"][:300],
+                        url_note="微博帖（正文已抓取·%s）" % r["tier"]))
         if len(out) >= limit:
             break
-        time.sleep(2.0)
     return out or [{"_error": e} for e in (errs[:2] or ["weibo: 本期无结果"])]
 
 
@@ -561,27 +610,18 @@ def do_social(a) -> dict:
                     items.append(it)
     items += [dict(it, group="观赛指南") for it in fetch_atp1000()]
 
-    # ── DDG 专项（2026-10-11 新增；DDG 有限流，所以给出**每期固定预算**：媒体稿 2 + 微博 1 + 小红书 1）──
+    # ── DDG 专项（2026-10-11 新增）：每期只发 1 条查询，按日轮换目标（见 DDG_TARGETS 注释）──
     # 媒体稿：2026 停车警方口径、限带清单全文这类内容多登在本地媒体（本地宝/澎湃/搜狐/上观）
-    ddg_plan = []
-    for g in CORE_GROUPS:
-        kw0 = (KEYWORD_SETS.get(g) or [None])[0]
-        if kw0:
-            ddg_plan.append((g, kw0, fetch_media))
-    social_core = (SOCIAL_DDG_CORE or [None])[0]
-    social_rot = SOCIAL_DDG_ROTATE[datetime.now(CST).toordinal() % len(SOCIAL_DDG_ROTATE)]
-    if social_core:
-        ddg_plan.append(("讨论热点", social_core, fetch_weibo))
-    ddg_plan.append(("讨论热点", social_rot, fetch_xhs))
-    for g, kw, fn in ddg_plan:
-        if throttle:
-            time.sleep(throttle)
-        for it in fn(kw):
-            if "_error" in it:
-                errors.append(it["_error"])
-                continue
-            it["group"] = g
-            items.append(it)
+    _fetchers = {"media": fetch_media, "weibo": fetch_weibo, "xhs": fetch_xhs}
+    g, kw, kind = DDG_TARGETS[datetime.now(CST).toordinal() % len(DDG_TARGETS)]
+    if throttle:
+        time.sleep(throttle)
+    for it in _fetchers[kind](kw):
+        if "_error" in it:
+            errors.append(it["_error"])      # 失败即止：本期不再尝试 DDG（避免加深冷却）
+            break
+        it["group"] = g
+        items.append(it)
 
     scored, dropped_neg, dropped_offtopic = [], 0, 0
     seen_fp = set()
@@ -719,6 +759,11 @@ def main() -> int:
     p.add_argument("--days", default=None, help="指定比赛日，如 3,4,5；或 all 回填全部（默认只取最新一天）")
     p.set_defaults(func=do_scores)
 
+    p = sub.add_parser("weibo", parents=[common],
+                       help="取单条微博正文（给 URL）：web_search 找到帖子链接后用这个取正文，不吃 DDG 限流")
+    p.add_argument("url", help="微博帖 URL（www.weibo.com/detail/<id> 或 m.weibo.cn/detail/<id>）")
+    p.set_defaults(func=lambda a: weibo_body(a.url))
+
     p = sub.add_parser("all", parents=[common], help="官方 + 第三方 + 赛果（cron 用）")
     p.add_argument("--group", default="全部",
                    choices=["全部", "核心"] + list(KEYWORD_SETS),
@@ -736,6 +781,9 @@ def main() -> int:
     as_json = getattr(a, "json", False) or a.cmd in ("all", "official", "scores")
     if as_json:
         print(json.dumps(res, ensure_ascii=False, indent=1))
+    elif res.get("url") and "body" in res:            # weibo 子命令
+        print("📄 微博正文（%s 路线）｜%s" % (res.get("tier") or "?", res.get("url")))
+        print(res.get("body") or ("⚠️ %s" % (res.get("error") or "未取到正文")))
     elif res.get("source") == "scores":
         print("🏁 赛果 ｜ 最新比赛日 %s（Day %s）｜ 已缓存 %s 天（%s）"
               % (res.get("latest_date"), res.get("latest_day"), len(res.get("days_cached") or []),

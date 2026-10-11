@@ -30,8 +30,11 @@ description: Use when 用户要上海网球大师赛（旗忠/旗忠网球中心
 S=~/.hermes/skills/shanghai-masters/scripts
 python3 $S/masters_fetch.py all --limit 12        # 官方站正文 + 第三方讨论 + 赛果（cron 用这个）
 python3 $S/masters_fetch.py scores                # 只取官方签表+赛果（累积；--days all 可回填）
+python3 $S/masters_fetch.py weibo <帖子URL>        # 取单条微博正文（web_search 找到帖后用这个，不吃 DDG 限流）
 python3 $S/masters_weather.py --date 2026-10-18   # 决赛日逐时天气（默认就是 10/18）
 ```
+
+⚠️ **`--json` 必须放在子命令后面**（`... scores --json`✓、`... --json scores`✗ 会被子命令的默认值覆盖）。`all`/`official`/`scores` 默认就出 JSON，不用加。
 
 抓取层输出里：
 - `official.pages.<页>.relevant` = 官方页里**带实操关键词的段落**（最可靠）
@@ -94,7 +97,7 @@ DDG（`html.duckduckgo.com`）**支持 `site:`**，是脚本侧拿到微博帖�
 ## Pitfalls
 
 1. **斯诺克/其他同名赛污染**：搜"上海大师赛"约一半结果是斯诺克或狼人杀（京城大师赛）——脚本已过滤，手工 web_search 时必须自己筛。
-2. **小红书正文抓不到**（登录墙），**但微博帖子正文抓得到**（`weibo.com/<uid>/detail/<id>` 的 `og:description`）。别再笼统写"微博抓不到"。
+2. **微博 / 小红书要分开说（2026-10-11 实测）**：**微博正文能拿**——但必须走 scrapling 真浏览器（`weibo_body` 已内置降级：先 urllib，撞「Sina Visitor System」登录墙就降 scrapling）；plain HTTP 抓 `www.weibo.com/detail/<id>` 或 `m.weibo.cn/detail/<id>` 一律只回 9KB 的登录页。**小红书正文拿不到**（笔记页本机 302 到 404/登录页）→ 只能引标题/摘要并标「转述」。**web_search 找到微博帖 URL 后，用 `masters_fetch.py weibo <URL>` 取正文，这条路径不吃 DDG 限流**。
 3. **DDG 会限流**：连续 5–8 次查询后返回 202/空结果；脚本已退避 20s 重试一次，**但冷却可能长达数小时**（2026-10-11 实测 20 分钟后仍 202）。看到 `ddg: 无结果（疑似限流）` → **用 `web_search` 补媒体稿/微博/小红书**（模板见 `references/sources.md` §三），**不要重试轰炸**（会延长冷却）。本机没有可替代的搜索引擎（mojeek 超时、brave 429、startpage/百度/sogou 无结果）。
 4. **`site:` 在 web_search 无效**（Parallel 不支持），要 `site:` 就用脚本里的 DDG。
 5. **B站解析**：必须取 `bili-video-card__info--tit` 的 `title` 属性；直接抓 `<a>` 文本会得到播放量"664 0 02:30"。

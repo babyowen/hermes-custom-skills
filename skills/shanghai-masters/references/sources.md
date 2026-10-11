@@ -9,14 +9,14 @@
 | **官方赛果 `/en/scores/results?resultDay=N`** | ✅ 可抓 | `masters_fetch.py scores --days all` | `completed-stats` 块 + stats-note。**混排单打/双打**，坑详见 §二.7 |
 | B站搜索 | ✅ 可抓（标准库） | 脚本内 `fetch_bilibili` | `<h3 class="bili-video-card__info--tit" title="…">`；标题即线索（Vlog/踩点/避坑） |
 | **DDG（html.duckduckgo.com）** | ✅ 可抓（**会限流**） | 脚本内 `fetch_media/fetch_weibo/fetch_xhs` | **支持 `site:`**（本机 web_search 不支持）；连续 5–8 次查询后返回 202/空结果，冷却数十分钟 |
-| **微博帖子正文页** | ✅ 可抓 | 脚本内 `fetch_weibo` | `www.weibo.com/<uid>/detail/<id>` 实测 58KB、**无登录墙**，正文在 `og:description`。但**微博搜索页**（s.weibo.com）仍 ❌ |
+| **微博帖子正文页** | ✅ 可抓（**须 scrapling 真浏览器**） | `masters_fetch.py weibo <URL>` 或脚本内 `fetch_weibo` | 2026-10-11 实测：urllib 抓 `www.weibo.com/detail/<id>`、`m.weibo.cn/detail/<id>` 一律只回 9KB「Sina Visitor System」登录页；**scrapling stealthy-fetch 能拿到正文**（8.3KB markdown，正文在「微博正文」段）。微博搜索页（s.weibo.com）仍 ❌ |
 | 百度搜索 | ✅ 可抓（会限流） | 脚本内 `fetch_baidu` | 本地宝、公众号、闵行融媒、新浪/腾讯转载都在结果里。**连续 3 轮全量搜索触发「安全验证」**，冷却数十分钟~数小时 |
 | 搜狗微信（公众号） | ⚠️ 弱 | 脚本内 `fetch_sogou_wechat` | 摘要质量高，但极易触发验证码；触发即跳过 |
 | atp1000.cn 球迷站 | ✅ 可抓 | 脚本内 `fetch_atp1000` | 连载型攻略；注意该栏目混其他赛事，已在 NEG 词表过滤 |
 | 本地媒体（停车场/限带清单主力） | ✅ 经 web_search | 上海本地宝 / 澎湃·闵行融媒 / 搜狐 / 凤凰 / 上观 / 上海体育 | **2026 停车警方口径、限带清单全文都登在这类稿件上**——最值钱的一档 |
 | Open-Meteo 天气 | ✅ 无密钥 | `masters_weather.py` | 逐日最多 16 天；**≥7 天只标趋势** |
 | OSM Overpass 停车场 | ⚠️ 低价值 | `masters_fetch.py parking` | 3km 内全无名无容量，**别当停车方案** |
-| **小红书笔记正文** | ❌ 不可达 | 只能取标题+摘要 | 笔记页一律跳登录（硬限制）；引摘要必须标「转述」 |
+| **小红书笔记正文** | ❌ 不可达 | 只能取标题+摘要 | 笔记页 302 到 404/登录页（2026-10-11 复测，scrapling 也一样）；引摘要必须标「转述」 |
 | **微博热搜 API** | ❌ 不可达 | 不用 | `weibo.com/ajax/side/hotSearch` 返回 403 |
 | **知乎搜索** | ❌ 不可达 | 不用 | 403 空壳 |
 | **大众点评** | ❌ 不可达 | 不用 | 滑块验证 |
